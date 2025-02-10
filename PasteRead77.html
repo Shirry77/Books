@@ -74,6 +74,14 @@
     .controls button:active {
       background: #005fa3;
     }
+    /* 新增：语音检索输入框样式 */
+    .controls input#voiceFilter {
+      width: 150px;
+      padding: 4px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
@@ -83,6 +91,10 @@
     
     <!-- 控制区 -->
     <div class="controls">
+      <!-- 语音检索输入框 -->
+      <label>语音检索:
+        <input type="text" id="voiceFilter" placeholder="输入关键字检索">
+      </label>
       <!-- 语音选择 -->
       <select id="voiceSelect"></select>
       <!-- 参数调整：速率、音调、音量 -->
@@ -116,27 +128,44 @@
     const synth = window.speechSynthesis;
     let utterance = null;
     const voiceSelect = document.getElementById("voiceSelect");
+    const voiceFilter = document.getElementById("voiceFilter");
+    let allVoices = []; // 保存所有语音
 
-    // 填充朗读角色（语音列表），并默认选中包含 "xiaoxiao" 的语音
+    // 填充语音列表，并保存到 allVoices，然后调用过滤函数
     function populateVoices() {
-      const voices = synth.getVoices();
+      allVoices = synth.getVoices();
+      filterVoices(voiceFilter.value);
+    }
+
+    // 根据输入关键字过滤语音列表
+    function filterVoices(filterText) {
+      const filter = filterText.toLowerCase();
       voiceSelect.innerHTML = '';
       let defaultFound = false;
-      voices.forEach(voice => {
+      // 筛选所有包含关键字（或语言代码包含）的语音
+      const filteredVoices = allVoices.filter(voice => {
+        return voice.name.toLowerCase().includes(filter) || voice.lang.toLowerCase().includes(filter);
+      });
+      filteredVoices.forEach(voice => {
         const option = document.createElement("option");
         option.value = voice.name;
         option.textContent = `${voice.name} (${voice.lang})`;
         voiceSelect.appendChild(option);
-        // 如果语音名称包含 "xiaoxiao"，则设为默认语音（不区分大小写）
+        // 默认选中包含 "xiaoxiao" 的语音（不区分大小写）
         if (!defaultFound && voice.name.toLowerCase().includes("xiaoxiao")) {
           voiceSelect.value = voice.name;
           defaultFound = true;
         }
       });
-      if (!defaultFound && voices.length > 0) {
+      if (!defaultFound && filteredVoices.length > 0) {
         voiceSelect.selectedIndex = 0;
       }
     }
+
+    // 监听语音检索输入框变化，实时过滤语音列表
+    voiceFilter.addEventListener("input", function() {
+      filterVoices(this.value);
+    });
 
     // 初始化语音列表
     populateVoices();
