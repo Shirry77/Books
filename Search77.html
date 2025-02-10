@@ -2,28 +2,26 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
-  <!-- 保证移动端按设备宽度缩放 -->
+  <!-- 设置视口，确保在移动设备上正确缩放 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>本地小说搜索</title>
+  <title>文本朗读 Demo</title>
   <style>
-    * { box-sizing: border-box; }
-    body {
+    /* 全屏布局及紧凑风格 */
+    html, body {
       margin: 0;
       padding: 0;
-      font-family: Arial, sans-serif;
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: #f7f7f7;
     }
-    /* 主容器：最大宽度600px，居中显示，采用Flex布局垂直排列，占满整个视口 */
-    #ui-container {
-      max-width: 600px;
-      margin: auto;
+    .container {
       display: flex;
       flex-direction: column;
       height: 100vh;
       padding: 4px;
     }
-    /* 头部区域：标题较小 */
-    #header {
+    /* 标题较小 */
+    .header {
       font-size: 16px;
       text-align: center;
       padding: 4px;
@@ -32,7 +30,7 @@
       border-radius: 4px;
       margin-bottom: 4px;
     }
-    /* 控制区：采用Flex布局，尽量紧凑排列 */
+    /* 控制区紧凑排列 */
     .controls {
       display: flex;
       flex-wrap: wrap;
@@ -63,8 +61,8 @@
     .controls button:active {
       background: #005fa3;
     }
-    /* 文本框区域：占据剩余空间 */
-    #text-content {
+    /* 文本框区域为主体 */
+    #text {
       flex: 1;
       width: 100%;
       padding: 6px;
@@ -73,326 +71,135 @@
       border-radius: 4px;
       resize: none;
     }
-    /* 进度条及辅助信息 */
-    #progress-container {
-      display: none;
-      width: 100%;
-      background: #eee;
-      border-radius: 4px;
-      margin: 2px 0;
-    }
-    #progress-bar {
-      height: 16px;
-      background: #0078d4;
-      color: #fff;
-      text-align: center;
-      border-radius: 4px;
-      transition: width 0.3s ease;
-    }
-    #history-message {
-      font-size: 12px;
-      color: #333;
-    }
   </style>
 </head>
-<body onload="loadFromHistory()">
-  <div id="ui-container">
-    <!-- 头部：标题 -->
-    <div id="header">本地小说搜索</div>
+<body>
+  <div class="container">
+    <!-- 标题 -->
+    <div class="header">文本朗读 Demo</div>
     
-    <!-- 上传及缓存信息 -->
+    <!-- 控制区：语音检索、选择、参数、操作按钮 -->
     <div class="controls">
-      <input type="file" accept=".txt" onchange="handleFileUpload(event)">
-      <span id="cache-status">📥 未缓存</span>
-    </div>
-    <div id="progress-container">
-      <div id="progress-bar">0%</div>
-    </div>
-    
-    <!-- 分页控制：行数设置、上一页、下一页、清缓存 -->
-    <div class="controls">
-      <span id="history-message"></span>
-      <label>每页行数:
-        <input type="number" id="batch-size" value="100" style="width:60px;">
+      <label>语音检索:
+        <input type="text" id="voiceFilter" placeholder="输入关键字检索">
       </label>
-      <button onclick="setBatchSize()">设置</button>
-      <button onclick="loadPreviousPage()">← 上一页</button>
-      <button onclick="loadNextPage()">下一页 →</button>
-      <button onclick="clearCache()">清理缓存</button>
-    </div>
-    
-    <!-- 搜索控制 -->
-    <div class="controls">
-      <label>搜索:
-        <input type="text" id="search-input" placeholder="搜索内容" style="width:120px;">
+      <select id="voiceSelect"></select>
+      <label>速率:
+        <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
       </label>
-      <label>显行数:
-        <input type="number" id="search-limit" value="100" style="width:60px;">
+      <label>音调:
+        <input type="range" id="pitch" min="0" max="2" step="0.1" value="1">
       </label>
-      <button onclick="searchText()">搜索</button>
+      <label>音量:
+        <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
+      </label>
+      <!-- 操作按钮 -->
+      <button id="start">开始</button>
+      <button id="pause">暂停</button>
+      <button id="resume">继续</button>
+      <button id="paste">粘贴</button>
     </div>
     
-    <!-- 主体文本区域 -->
-    <textarea id="text-content" placeholder="小说内容..."></textarea>
-    
-    <!-- 复制按钮 -->
-    <div class="controls">
-      <button onclick="copyText()">复制文本</button>
-    </div>
+    <!-- 文本框区域 -->
+    <textarea id="text" placeholder="在这里粘贴或输入文本..."></textarea>
   </div>
   
   <script>
-    // 以下代码保持原有功能：IndexedDB 缓存、全文分页、搜索分页、复制剪贴板等
+    // 检查浏览器是否支持 SpeechSynthesis
+    if (!('speechSynthesis' in window)) {
+      alert("对不起，你的浏览器不支持语音朗读功能。");
+    }
+    
+    const synth = window.speechSynthesis;
+    let utterance = null;
+    const voiceSelect = document.getElementById("voiceSelect");
+    const voiceFilter = document.getElementById("voiceFilter");
+    let allVoices = []; // 保存所有语音
 
-    let fileContent = "";  // 小说内容（按行存储，数组形式）
-    let pageIndex = 0;     // 当前全文分页页码，从 0 开始
-    let batchSize = 100;   // 每页加载的全文行数
-
-    // 搜索模式下的分页变量
-    let searchMode = false;      // 是否处于搜索模式
-    let searchStartLine = 0;     // 搜索结果起始行
-    let searchPageIndex = 0;     // 搜索结果当前页，从 0 开始
-    const defaultSearchLimit = 100; // 默认搜索结果每页行数
-
-    const dbName = "NovelDB";
-    const storeName = "novels";
-
-    function openDB(callback) {
-      const request = indexedDB.open(dbName, 1);
-      request.onupgradeneeded = function(event) {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains(storeName)) {
-          db.createObjectStore(storeName, { keyPath: "id" });
-        }
-      };
-      request.onsuccess = function(event) {
-        callback(event.target.result);
-      };
-      request.onerror = function(event) {
-        console.error("IndexedDB 打开失败", event);
-      };
+    // 填充语音列表，并保存到 allVoices，然后调用过滤函数
+    function populateVoices() {
+      allVoices = synth.getVoices();
+      filterVoices(voiceFilter.value);
     }
 
-    function saveToIndexedDB(novelText) {
-      openDB(function(db) {
-        const transaction = db.transaction([storeName], "readwrite");
-        const store = transaction.objectStore(storeName);
-        store.put({ id: "novel_text", text: novelText });
-        transaction.oncomplete = function() {
-          console.log("小说已保存到 IndexedDB");
-          document.getElementById("cache-status").innerText = "✅ 已缓存";
-          loadFromHistory();
-        };
-        transaction.onerror = function(event) {
-          console.error("保存到 IndexedDB 出错", event);
-        };
+    // 根据输入关键字过滤语音列表，默认选中 lang 包含 "zh" 的语音
+    function filterVoices(filterText) {
+      const filter = filterText.toLowerCase();
+      voiceSelect.innerHTML = '';
+      let defaultFound = false;
+      const filteredVoices = allVoices.filter(voice => {
+        return voice.name.toLowerCase().includes(filter) || voice.lang.toLowerCase().includes(filter);
       });
-    }
-
-    function loadFromIndexedDB(callback) {
-      openDB(function(db) {
-        const transaction = db.transaction([storeName], "readonly");
-        const store = transaction.objectStore(storeName);
-        const getRequest = store.get("novel_text");
-        getRequest.onsuccess = function() {
-          if (getRequest.result) {
-            callback(getRequest.result.text);
-          } else {
-            callback(null);
-          }
-        };
-        getRequest.onerror = function(event) {
-          console.error("IndexedDB 读取错误", event);
-          callback(null);
-        };
-      });
-    }
-
-    function clearIndexedDBCache() {
-      openDB(function(db) {
-        const transaction = db.transaction([storeName], "readwrite");
-        const store = transaction.objectStore(storeName);
-        store.delete("novel_text");
-        transaction.oncomplete = function() {
-          alert("✅ 缓存已清除！");
-          document.getElementById("cache-status").innerText = "📥 未缓存";
-          document.getElementById("history-message").innerText = "";
-          fileContent = "";
-          pageIndex = 0;
-          searchMode = false;
-          document.getElementById("text-content").value = "";
-        };
-      });
-    }
-
-    function handleFileUpload(event) {
-      const file = event.target.files[0];
-      if (!file || file.type !== "text/plain") {
-        alert("请上传 TXT 格式的小说文件！");
-        return;
-      }
-      pageIndex = 0;
-      localStorage.removeItem("novel_page");
-      clearIndexedDBCache();
-
-      const reader = new FileReader();
-      const progressBar = document.getElementById("progress-bar");
-      const progressContainer = document.getElementById("progress-container");
-      progressContainer.style.display = "block";
-      progressBar.style.width = "0%";
-      progressBar.innerText = "0%";
-      document.getElementById("cache-status").innerText = "📥 正在读取文件...";
-
-      reader.onprogress = function(event) {
-        if (event.lengthComputable) {
-          let percent = Math.round((event.loaded / event.total) * 100);
-          progressBar.style.width = percent + "%";
-          progressBar.innerText = percent + "%";
-        }
-      };
-
-      reader.onload = function(e) {
-        fileContent = e.target.result.split("\n");
-        saveToIndexedDB(fileContent.join("\n"));
-        progressBar.style.width = "100%";
-        progressBar.innerText = "100%";
-        progressContainer.style.display = "none";
-      };
-
-      reader.readAsText(file, "GBK");
-    }
-
-    function loadPage(page) {
-      if (!fileContent || fileContent.length === 0) {
-        alert("尚未加载小说内容！");
-        return;
-      }
-      if (page < 0) {
-        alert("已经是第一页了！");
-        return;
-      }
-      if (page * batchSize >= fileContent.length) {
-        alert("已经到最后一页了！");
-        return;
-      }
-      searchMode = false;
-      pageIndex = page;
-      const textArea = document.getElementById("text-content");
-      const pageContent = fileContent.slice(page * batchSize, (page + 1) * batchSize).join("\n");
-      textArea.value = pageContent;
-      saveHistory();
-      document.getElementById("history-message").innerText =
-        `📌 页：${pageIndex + 1}（行 ${pageIndex * batchSize + 1}-${(pageIndex + 1) * batchSize}）`;
-    }
-
-    function loadNextPage() {
-      if (searchMode) {
-        const searchLimit = parseInt(document.getElementById("search-limit").value) || defaultSearchLimit;
-        if (searchStartLine + (searchPageIndex + 1) * searchLimit >= fileContent.length) {
-          alert("搜索结果已到最后一页！");
-          return;
-        }
-        searchPageIndex++;
-        displaySearchPage();
-      } else {
-        loadPage(pageIndex + 1);
-      }
-    }
-
-    function loadPreviousPage() {
-      if (searchMode) {
-        if (searchPageIndex <= 0) {
-          alert("搜索结果已到第一页！");
-          return;
-        }
-        searchPageIndex--;
-        displaySearchPage();
-      } else {
-        loadPage(pageIndex - 1);
-      }
-    }
-
-    function saveHistory() {
-      localStorage.setItem("novel_page", pageIndex);
-    }
-
-    function loadFromHistory() {
-      loadFromIndexedDB(function(cachedText) {
-        if (cachedText) {
-          fileContent = cachedText.split("\n");
-          document.getElementById("cache-status").innerText = "✅ 已缓存";
-        }
-        const savedPage = localStorage.getItem("novel_page");
-        if (savedPage) {
-          pageIndex = parseInt(savedPage);
-          loadPage(pageIndex);
-        } else {
-          loadPage(0);
+      filteredVoices.forEach(voice => {
+        const option = document.createElement("option");
+        option.value = voice.name;
+        option.textContent = `${voice.name} (${voice.lang})`;
+        voiceSelect.appendChild(option);
+        if (!defaultFound && voice.lang.toLowerCase().includes("zh")) {
+          voiceSelect.value = voice.name;
+          defaultFound = true;
         }
       });
-    }
-
-    function setBatchSize() {
-      const inputSize = parseInt(document.getElementById("batch-size").value);
-      if (inputSize > 0) {
-        batchSize = inputSize;
-        alert(`每页加载 ${batchSize} 行`);
-      } else {
-        alert("请输入有效数字");
+      if (!defaultFound && filteredVoices.length > 0) {
+        voiceSelect.selectedIndex = 0;
       }
     }
 
-    function clearCache() {
-      clearIndexedDBCache();
-      localStorage.removeItem("novel_page");
+    // 监听语音检索输入变化
+    voiceFilter.addEventListener("input", function() {
+      filterVoices(this.value);
+    });
+
+    populateVoices();
+    if (typeof synth.onvoiceschanged !== 'undefined') {
+      synth.onvoiceschanged = populateVoices;
     }
 
-    function displaySearchPage() {
-      const searchLimit = parseInt(document.getElementById("search-limit").value) || defaultSearchLimit;
-      const start = searchStartLine + searchPageIndex * searchLimit;
-      const end = start + searchLimit;
-      const textArea = document.getElementById("text-content");
-      textArea.value = fileContent.slice(start, end).join("\n");
-      textArea.scrollTop = 0;
-      document.getElementById("history-message").innerText =
-        `🔍 搜索页：${searchPageIndex + 1}（从行 ${start + 1} 开始）`;
-    }
+    // 开始朗读
+    document.getElementById("start").addEventListener("click", function() {
+      if (synth.speaking) {
+        synth.cancel();
+      }
+      const text = document.getElementById("text").value.trim();
+      if (text !== "") {
+        utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = parseFloat(document.getElementById("rate").value);
+        utterance.pitch = parseFloat(document.getElementById("pitch").value);
+        utterance.volume = parseFloat(document.getElementById("volume").value);
+        const selectedVoiceName = voiceSelect.value;
+        const voices = synth.getVoices();
+        const selectedVoice = voices.find(voice => voice.name === selectedVoiceName);
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+        }
+        synth.speak(utterance);
+      }
+    });
 
-    function searchText() {
-      const query = document.getElementById("search-input").value.trim();
-      if (!query) {
-        alert("请输入搜索内容！");
-        return;
+    // 暂停朗读
+    document.getElementById("pause").addEventListener("click", function() {
+      if (synth.speaking && !synth.paused) {
+        synth.pause();
       }
-      if (!fileContent || fileContent.length === 0) {
-        alert("小说内容尚未加载！");
-        return;
-      }
-      if (typeof fileContent === "string") {
-        fileContent = fileContent.split("\n");
-      }
-      const foundLine = fileContent.findIndex(line => line.indexOf(query) !== -1);
-      if (foundLine === -1) {
-        alert("未找到相关内容！");
-      } else {
-        searchMode = true;
-        searchStartLine = foundLine;
-        searchPageIndex = 0;
-        displaySearchPage();
-        alert(`找到 “${query}” 在第 ${foundLine + 1} 行，显示搜索页1`);
-      }
-    }
+    });
 
-    function copyText() {
-      const text = document.getElementById("text-content").value;
-      if (!text) {
-        alert("文本为空！");
-        return;
+    // 继续朗读
+    document.getElementById("resume").addEventListener("click", function() {
+      if (synth.paused) {
+        synth.resume();
       }
-      navigator.clipboard.writeText(text)
-      .then(() => { alert("文本已复制到剪贴板！"); })
-      .catch(err => { alert("复制失败: " + err); });
-    }
+    });
+
+    // 从剪贴板粘贴内容到文本框
+    document.getElementById("paste").addEventListener("click", function() {
+      navigator.clipboard.readText()
+      .then(text => {
+        document.getElementById("text").value = text;
+      })
+      .catch(err => {
+        alert("粘贴失败：" + err);
+      });
+    });
   </script>
 </body>
 </html>
