@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>文本朗读 Demo</title>
   <style>
-    /* 全屏布局，消除默认间距 */
+    /* 全屏布局及紧凑风格 */
     html, body {
       margin: 0;
       padding: 0;
@@ -14,90 +14,76 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: #f7f7f7;
     }
-    /* 容器采用 Flex 布局，垂直排列 */
     .container {
       display: flex;
       flex-direction: column;
       height: 100vh;
+      padding: 4px;
     }
-    /* 顶部标题和控制区域，占用较少高度 */
+    /* 标题较小 */
     .header {
+      font-size: 16px;
+      text-align: center;
+      padding: 4px;
       background: #0078d4;
       color: #fff;
-      padding: 6px 10px;
-      text-align: center;
-      font-size: 18px;
+      border-radius: 4px;
+      margin-bottom: 4px;
     }
+    /* 控制区紧凑排列 */
     .controls {
-      background: #f0f0f0;
-      padding: 5px 10px;
       display: flex;
       flex-wrap: wrap;
+      gap: 4px;
+      font-size: 14px;
+      margin-bottom: 4px;
       align-items: center;
+    }
+    .controls > * {
+      margin: 2px 0;
+    }
+    .controls input[type="text"],
+    .controls input[type="number"],
+    .controls input[type="file"],
+    .controls select {
+      padding: 2px 4px;
       font-size: 14px;
     }
-    .controls label,
-    .controls select,
-    .controls input,
     .controls button {
-      margin: 3px;
-    }
-    /* 为 range 控件设置简洁样式 */
-    .controls input[type="range"] {
-      width: 70px;
-    }
-    /* 文本区域占据剩余大部分空间 */
-    .content {
-      flex: 1;
-      padding: 5px 10px;
-    }
-    .content textarea {
-      width: 100%;
-      height: 100%;
-      padding: 10px;
-      font-size: 16px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      resize: none;
-      box-sizing: border-box;
-    }
-    /* 按钮风格统一且较大，便于触控 */
-    .controls button {
-      padding: 6px 10px;
+      padding: 4px 8px;
+      font-size: 14px;
       background: #0078d4;
       color: #fff;
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 14px;
     }
     .controls button:active {
       background: #005fa3;
     }
-    /* 新增：语音检索输入框样式 */
-    .controls input#voiceFilter {
-      width: 150px;
-      padding: 4px;
+    /* 文本框区域为主体 */
+    #text {
+      flex: 1;
+      width: 100%;
+      padding: 6px;
       font-size: 14px;
       border: 1px solid #ccc;
       border-radius: 4px;
+      resize: none;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- 顶部标题 -->
+    <!-- 标题 -->
     <div class="header">文本朗读 Demo</div>
     
-    <!-- 控制区 -->
+    <!-- 控制区：语音检索、选择、参数、操作按钮 -->
     <div class="controls">
-      <!-- 语音检索输入框 -->
       <label>语音检索:
         <input type="text" id="voiceFilter" placeholder="输入关键字检索">
       </label>
-      <!-- 语音选择 -->
       <select id="voiceSelect"></select>
-      <!-- 参数调整：速率、音调、音量 -->
       <label>速率:
         <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
       </label>
@@ -107,16 +93,15 @@
       <label>音量:
         <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
       </label>
-      <!-- 控制按钮，完整显示文字 -->
+      <!-- 操作按钮 -->
       <button id="start">开始</button>
       <button id="pause">暂停</button>
       <button id="resume">继续</button>
+      <button id="paste">粘贴</button>
     </div>
     
-    <!-- 文本区域 -->
-    <div class="content">
-      <textarea id="text" placeholder="在这里粘贴或输入文本..."></textarea>
-    </div>
+    <!-- 文本框区域 -->
+    <textarea id="text" placeholder="在这里粘贴或输入文本..."></textarea>
   </div>
   
   <script>
@@ -137,12 +122,11 @@
       filterVoices(voiceFilter.value);
     }
 
-    // 根据输入关键字过滤语音列表
+    // 根据输入关键字过滤语音列表，默认选中 lang 包含 "zh" 的语音
     function filterVoices(filterText) {
       const filter = filterText.toLowerCase();
       voiceSelect.innerHTML = '';
       let defaultFound = false;
-      // 筛选所有包含关键字（或语言代码包含）的语音
       const filteredVoices = allVoices.filter(voice => {
         return voice.name.toLowerCase().includes(filter) || voice.lang.toLowerCase().includes(filter);
       });
@@ -151,8 +135,7 @@
         option.value = voice.name;
         option.textContent = `${voice.name} (${voice.lang})`;
         voiceSelect.appendChild(option);
-        // 默认选中包含 "xiaoxiao" 的语音（不区分大小写）
-        if (!defaultFound && voice.name.toLowerCase().includes("xiaoxiao")) {
+        if (!defaultFound && voice.lang.toLowerCase().includes("zh")) {
           voiceSelect.value = voice.name;
           defaultFound = true;
         }
@@ -162,12 +145,11 @@
       }
     }
 
-    // 监听语音检索输入框变化，实时过滤语音列表
+    // 监听语音检索输入变化
     voiceFilter.addEventListener("input", function() {
       filterVoices(this.value);
     });
 
-    // 初始化语音列表
     populateVoices();
     if (typeof synth.onvoiceschanged !== 'undefined') {
       synth.onvoiceschanged = populateVoices;
@@ -181,11 +163,9 @@
       const text = document.getElementById("text").value.trim();
       if (text !== "") {
         utterance = new SpeechSynthesisUtterance(text);
-        // 设置速率、音调和音量
         utterance.rate = parseFloat(document.getElementById("rate").value);
         utterance.pitch = parseFloat(document.getElementById("pitch").value);
         utterance.volume = parseFloat(document.getElementById("volume").value);
-        // 根据下拉框选择设置朗读角色
         const selectedVoiceName = voiceSelect.value;
         const voices = synth.getVoices();
         const selectedVoice = voices.find(voice => voice.name === selectedVoiceName);
@@ -208,6 +188,17 @@
       if (synth.paused) {
         synth.resume();
       }
+    });
+
+    // 从剪贴板粘贴内容到文本框
+    document.getElementById("paste").addEventListener("click", function() {
+      navigator.clipboard.readText()
+      .then(text => {
+        document.getElementById("text").value = text;
+      })
+      .catch(err => {
+        alert("粘贴失败：" + err);
+      });
     });
   </script>
 </body>
