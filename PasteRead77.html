@@ -64,24 +64,23 @@
       border: 1px solid #ccc;
       border-radius: 4px;
       background: #fff;
-      /* 如果不希望用户看到也可通过调整样式，例如设置透明度等，不过注意隐藏的内容可能不被朗读 */
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- 标题 -->
-    <div class="header">文本朗读识别 Demo</div>
+    <!-- 标题区域（通过 aria-hidden 排除朗读识别） -->
+    <div class="header" aria-hidden="true">文本朗读识别 Demo</div>
     
-    <!-- 控制区，只保留粘贴按钮 -->
-    <div class="controls">
+    <!-- 控制区：仅保留粘贴按钮，设置 aria-hidden 使其不被朗读 -->
+    <div class="controls" aria-hidden="true">
       <button id="paste">粘贴</button>
     </div>
     
     <!-- 文本框区域 -->
     <textarea id="text" placeholder="在这里粘贴或输入文本..."></textarea>
     
-    <!-- 文本镜像区域，用于大声朗读识别 -->
+    <!-- 用于大声朗读识别的文本镜像区域 -->
     <div id="readable">这里会实时显示文本框内容</div>
   </div>
   
@@ -89,7 +88,7 @@
     const textArea = document.getElementById("text");
     const readableDiv = document.getElementById("readable");
 
-    // 每次文本框内容变化时，同步更新镜像区域
+    // 文本框内容变化时同步更新镜像区域
     textArea.addEventListener("input", () => {
       readableDiv.textContent = textArea.value;
     });
