@@ -4,8 +4,9 @@
   <meta charset="UTF-8">
   <!-- 设置视口，确保在移动设备上正确缩放 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>文本朗读识别 Demo</title>
+  <title>文本朗读 Demo</title>
   <style>
+    /* 全屏布局及紧凑风格 */
     html, body {
       margin: 0;
       padding: 0;
@@ -36,6 +37,16 @@
       margin-bottom: 4px;
       align-items: center;
     }
+    .controls > * {
+      margin: 2px 0;
+    }
+    .controls input[type="text"],
+    .controls input[type="number"],
+    .controls input[type="file"],
+    .controls select {
+      padding: 2px 4px;
+      font-size: 14px;
+    }
     .controls button {
       padding: 4px 8px;
       font-size: 14px;
@@ -48,8 +59,9 @@
     .controls button:active {
       background: #005fa3;
     }
-    /* 文本框样式 */
+    /* 文本框区域为主体 */
     #text {
+      flex: 1;
       width: 100%;
       padding: 6px;
       font-size: 14px;
@@ -57,47 +69,124 @@
       border-radius: 4px;
       resize: none;
     }
-    /* 用于朗读的文本镜像区域 */
-    #readable {
-      margin-top: 10px;
-      padding: 6px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      background: #fff;
-    }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- 标题区域（通过 aria-hidden 排除朗读识别） -->
-    <div class="header" aria-hidden="true">文本朗读识别 Demo</div>
+    <!-- 标题 -->
+    <div class="header">文本朗读 Demo</div>
     
-    <!-- 控制区：仅保留粘贴按钮，设置 aria-hidden 使其不被朗读 -->
-    <div class="controls" aria-hidden="true">
+    <!-- 控制区 -->
+    <div class="controls">
+      <label>语音检索:
+        <input type="text" id="voiceFilter" placeholder="输入关键字检索">
+      </label>
+      <select id="voiceSelect"></select>
+      <label>速率:
+        <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
+      </label>
+      <label>音调:
+        <input type="range" id="pitch" min="0" max="2" step="0.1" value="1">
+      </label>
+      <label>音量:
+        <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
+      </label>
+      <button id="start">开始</button>
+      <button id="pause">暂停</button>
+      <button id="resume">继续</button>
       <button id="paste">粘贴</button>
     </div>
     
     <!-- 文本框区域 -->
     <textarea id="text" placeholder="在这里粘贴或输入文本..."></textarea>
-    
-    <!-- 用于大声朗读识别的文本镜像区域 -->
-    <div id="readable">这里会实时显示文本框内容</div>
   </div>
   
   <script>
-    const textArea = document.getElementById("text");
-    const readableDiv = document.getElementById("readable");
+    if (!('speechSynthesis' in window)) {
+      alert("对不起，你的浏览器不支持语音朗读功能。");
+    }
+    
+    const synth = window.speechSynthesis;
+    let utterance = null;
+    const voiceSelect = document.getElementById("voiceSelect");
+    const voiceFilter = document.getElementById("voiceFilter");
+    let allVoices = [];
 
-    // 文本框内容变化时同步更新镜像区域
-    textArea.addEventListener("input", () => {
-      readableDiv.textContent = textArea.value;
+    function populateVoices() {
+      allVoices = synth.getVoices();
+      filterVoices(voiceFilter.value);
+    }
+
+    function filterVoices(filterText) {
+      const filter = filterText.toLowerCase();
+      voiceSelect.innerHTML = '';
+      let defaultFound = false;
+      const filteredVoices = allVoices.filter(voice => {
+        return voice.name.toLowerCase().includes(filter) || voice.lang.toLowerCase().includes(filter);
+      });
+      filteredVoices.forEach(voice => {
+        const option = document.createElement("option");
+        option.value = voice.name;
+        option.textContent = `${voice.name} (${voice.lang})`;
+        voiceSelect.appendChild(option);
+        // 默认选中第一个 lang 包含 "zh" 的语音
+        if (!defaultFound && voice.lang.toLowerCase().includes("zh")) {
+          voiceSelect.value = voice.name;
+          defaultFound = true;
+        }
+      });
+      if (!defaultFound && filteredVoices.length > 0) {
+        voiceSelect.selectedIndex = 0;
+      }
+    }
+
+    voiceFilter.addEventListener("input", function() {
+      filterVoices(this.value);
+    });
+
+    populateVoices();
+    if (typeof synth.onvoiceschanged !== 'undefined') {
+      synth.onvoiceschanged = populateVoices;
+    }
+
+    document.getElementById("start").addEventListener("click", function() {
+      if (synth.speaking) {
+        synth.cancel();
+      }
+      const text = document.getElementById("text").value.trim();
+      if (text !== "") {
+        utterance = new SpeechSynthesisUtterance(text);
+        // 明确设置中文朗读
+        utterance.lang = "zh-CN";
+        utterance.rate = parseFloat(document.getElementById("rate").value);
+        utterance.pitch = parseFloat(document.getElementById("pitch").value);
+        utterance.volume = parseFloat(document.getElementById("volume").value);
+        const selectedVoiceName = voiceSelect.value;
+        const voices = synth.getVoices();
+        const selectedVoice = voices.find(voice => voice.name === selectedVoiceName);
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+        }
+        synth.speak(utterance);
+      }
+    });
+
+    document.getElementById("pause").addEventListener("click", function() {
+      if (synth.speaking && !synth.paused) {
+        synth.pause();
+      }
+    });
+
+    document.getElementById("resume").addEventListener("click", function() {
+      if (synth.paused) {
+        synth.resume();
+      }
     });
 
     document.getElementById("paste").addEventListener("click", function() {
       navigator.clipboard.readText()
       .then(text => {
-        textArea.value = text;
-        readableDiv.textContent = text;
+        document.getElementById("text").value = text;
       })
       .catch(err => {
         alert("粘贴失败：" + err);
