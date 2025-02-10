@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>文本朗读 Demo</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    textarea { width: 100%; max-width: 600px; }
+    .control-group { margin: 10px 0; }
+    label { margin-right: 10px; }
+  </style>
+</head>
+<body>
+  <h1>文本朗读 Demo</h1>
+  
+  <!-- 文本输入 -->
+  <div class="control-group">
+    <textarea id="text" rows="8" placeholder="在这里粘贴或输入文本..."></textarea>
+  </div>
+  
+  <!-- 朗读角色选择 -->
+  <div class="control-group">
+    <label for="voiceSelect">选择朗读角色:</label>
+    <select id="voiceSelect"></select>
+  </div>
+  
+  <!-- 参数控制 -->
+  <div class="control-group">
+    <label for="rate">速度:</label>
+    <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
+    <span id="rateValue">1</span>
+  </div>
+  
+  <div class="control-group">
+    <label for="pitch">音调:</label>
+    <input type="range" id="pitch" min="0" max="2" step="0.1" value="1">
+    <span id="pitchValue">1</span>
+  </div>
+  
+  <div class="control-group">
+    <label for="volume">音量:</label>
+    <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
+    <span id="volumeValue">1</span>
+  </div>
+  
+  <!-- 控制按钮 -->
+  <div class="control-group">
+    <button id="start">开始</button>
+    <button id="pause">暂停</button>
+    <button id="resume">继续</button>
+  </div>
+  
+  <script>
+    // 检查浏览器是否支持 SpeechSynthesis
+    if (!('speechSynthesis' in window)) {
+      alert("对不起，你的浏览器不支持语音朗读功能。");
+    }
+    
+    const synth = window.speechSynthesis;
+    let utterance = null;
+    const voiceSelect = document.getElementById("voiceSelect");
+
+    // 填充朗读角色（语音列表）
+    function populateVoices() {
+      const voices = synth.getVoices();
+      voiceSelect.innerHTML = '';
+      voices.forEach(voice => {
+        const option = document.createElement("option");
+        option.value = voice.name;
+        option.textContent = `${voice.name} (${voice.lang})`;
+        voiceSelect.appendChild(option);
+      });
+    }
+
+    // 初始化语音列表
+    populateVoices();
+    if (typeof synth.onvoiceschanged !== 'undefined') {
+      synth.onvoiceschanged = populateVoices;
+    }
+
+    // 实时更新参数显示
+    document.getElementById("rate").addEventListener("input", function() {
+      document.getElementById("rateValue").textContent = this.value;
+    });
+    document.getElementById("pitch").addEventListener("input", function() {
+      document.getElementById("pitchValue").textContent = this.value;
+    });
+    document.getElementById("volume").addEventListener("input", function() {
+      document.getElementById("volumeValue").textContent = this.value;
+    });
+
+    // 开始朗读
+    document.getElementById("start").addEventListener("click", function() {
+      if (synth.speaking) {
+        synth.cancel();
+      }
+      const text = document.getElementById("text").value.trim();
+      if (text !== "") {
+        utterance = new SpeechSynthesisUtterance(text);
+        // 设置速率、音调和音量
+        utterance.rate = parseFloat(document.getElementById("rate").value);
+        utterance.pitch = parseFloat(document.getElementById("pitch").value);
+        utterance.volume = parseFloat(document.getElementById("volume").value);
+        // 根据下拉框选择设置朗读角色
+        const selectedVoiceName = voiceSelect.value;
+        const voices = synth.getVoices();
+        const selectedVoice = voices.find(voice => voice.name === selectedVoiceName);
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+        }
+        synth.speak(utterance);
+      }
+    });
+
+    // 暂停朗读
+    document.getElementById("pause").addEventListener("click", function() {
+      if (synth.speaking && !synth.paused) {
+        synth.pause();
+      }
+    });
+
+    // 继续朗读
+    document.getElementById("resume").addEventListener("click", function() {
+      if (synth.paused) {
+        synth.resume();
+      }
+    });
+  </script>
+</body>
+</html>
