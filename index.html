@@ -12,8 +12,13 @@
       padding: 20px;
       line-height: 1.8;
     }
-    #history-message {
-      color: green;
+    /* 包含除小说正文外的所有UI的容器 */
+    #ui-container {
+      /* 默认显示 */
+    }
+    /* 以下元素在 UI 容器中会被 aria-hidden 隐藏后不被朗读 */
+    #page-header, #cache-status, #history-message, #batch-size-label, #search-label {
+      /* 可根据需要添加样式 */
     }
     #progress-container {
       display: none;
@@ -56,7 +61,7 @@
       position: relative;
       width: 100%;
     }
-    /* 全屏容器样式 */
+    /* 模拟全屏：让文本容器占满整个视窗 */
     #text-container.fullscreen {
       position: fixed;
       top: 0;
@@ -313,9 +318,20 @@
     }
 
     // 全屏功能：切换文本框容器全屏显示（通过 CSS 类模拟全屏）
+    // 同时，隐藏包含其他UI的容器（#ui-container），使大声朗读只朗读正文内容
     function toggleFullScreen() {
       const container = document.getElementById("text-container");
+      const uiContainer = document.getElementById("ui-container");
       container.classList.toggle("fullscreen");
+      if (container.classList.contains("fullscreen")) {
+        if (uiContainer) {
+          uiContainer.setAttribute("aria-hidden", "true");
+        }
+      } else {
+        if (uiContainer) {
+          uiContainer.removeAttribute("aria-hidden");
+        }
+      }
     }
 
     // 添加键盘事件监听，按 Esc 键退出全屏（适用于电脑）
@@ -324,6 +340,10 @@
         const container = document.getElementById("text-container");
         if (container.classList.contains("fullscreen")) {
           container.classList.remove("fullscreen");
+          const uiContainer = document.getElementById("ui-container");
+          if (uiContainer) {
+            uiContainer.removeAttribute("aria-hidden");
+          }
           console.log("退出全屏模式");
         }
       }
@@ -332,30 +352,28 @@
 </head>
 <body>
 
-  <h1>📖 本地小说听书 - IndexedDB 缓存 & 分页搜索</h1>
-  <p id="cache-status">📥 请上传小说 TXT 文件</p>
-  <input type="file" accept=".txt" onchange="handleFileUpload(event)">
-
-  <div id="progress-container">
-    <div id="progress-bar">0%</div>
+  <!-- 包含除正文外的所有界面控件 -->
+  <div id="ui-container">
+    <h1 id="page-header">📖 本地小说听书 - IndexedDB 缓存 & 分页搜索</h1>
+    <p id="cache-status">📥 请上传小说 TXT 文件</p>
+    <input type="file" accept=".txt" onchange="handleFileUpload(event)">
+    <div id="progress-container">
+      <div id="progress-bar">0%</div>
+    </div>
+    <p id="history-message"></p>
+    <label id="batch-size-label">🔄 每页加载多少行：</label>
+    <input type="number" id="batch-size" value="100">
+    <button onclick="setBatchSize()">设置</button>
+    <br>
+    <button onclick="loadPreviousPage()">⬅️ 加载上一部分</button>
+    <button onclick="loadNextPage()">加载下一部分 ➡️</button>
+    <button onclick="clearCache()">🗑 清除缓存</button>
+    <button onclick="toggleFullScreen()">全屏文本框</button>
+    <br><br>
+    <label id="search-label">🔍 搜索内容：</label>
+    <input type="text" id="search-input" placeholder="请输入搜索内容">
+    <button onclick="searchText()">搜索</button>
   </div>
-
-  <p id="history-message"></p>
-
-  <label>🔄 每页加载多少行：</label>
-  <input type="number" id="batch-size" value="100">
-  <button onclick="setBatchSize()">设置</button>
-
-  <br>
-  <button onclick="loadPreviousPage()">⬅️ 加载上一部分</button>
-  <button onclick="loadNextPage()">加载下一部分 ➡️</button>
-  <button onclick="clearCache()">🗑 清除缓存</button>
-  <button onclick="toggleFullScreen()">全屏文本框</button>
-
-  <br><br>
-  <label>🔍 搜索内容：</label>
-  <input type="text" id="search-input" placeholder="请输入搜索内容">
-  <button onclick="searchText()">搜索</button>
 
   <p>📜 小说内容：</p>
   <!-- 文本容器：包含文本框和退出全屏按钮 -->
