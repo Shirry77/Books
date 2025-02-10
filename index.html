@@ -12,14 +12,11 @@
       padding: 20px;
       line-height: 1.8;
     }
-    /* 包含除小说正文外的所有UI的容器 */
+    /* UI 容器：包含所有功能性控件 */
     #ui-container {
-      /* 默认显示 */
+      margin-bottom: 20px;
     }
-    /* 以下元素在 UI 容器中会被 aria-hidden 隐藏后不被朗读 */
-    #page-header, #cache-status, #history-message, #batch-size-label, #search-label {
-      /* 可根据需要添加样式 */
-    }
+    /* 进度条样式 */
     #progress-container {
       display: none;
       width: 100%;
@@ -60,9 +57,10 @@
     #text-container {
       position: relative;
       width: 100%;
+      transition: all 0.3s ease;
     }
-    /* 模拟全屏：让文本容器占满整个视窗 */
-    #text-container.fullscreen {
+    /* 阅读模式样式：使文本容器覆盖整个视口 */
+    #text-container.reading-mode {
       position: fixed;
       top: 0;
       left: 0;
@@ -73,35 +71,34 @@
       padding: 10px;
       box-sizing: border-box;
     }
-    #text-container.fullscreen textarea {
+    #text-container.reading-mode textarea {
       width: 100%;
       height: 100%;
       margin-top: 0;
     }
-    /* 退出全屏按钮，仅在全屏状态下显示 */
-    #exit-fullscreen-btn {
+    /* 退出阅读模式按钮，仅在阅读模式下显示 */
+    #exit-reading-btn {
       display: none;
       position: absolute;
       top: 10px;
       right: 10px;
       z-index: 10000;
-      background: rgba(0,0,0,0.5);
+      background: rgba(0,0,0,0.7);
       color: white;
       border: none;
       padding: 10px;
       border-radius: 5px;
       cursor: pointer;
     }
-    #text-container.fullscreen #exit-fullscreen-btn {
+    #text-container.reading-mode #exit-reading-btn {
       display: block;
     }
   </style>
   <script>
-    let fileContent = "";  // 小说内容，按行存储（数组）
-    let pageIndex = 0;     // 当前页索引（从0开始）
+    let fileContent = "";  // 小说内容（按行存储，数组）
+    let pageIndex = 0;     // 当前页索引，从0开始
     let batchSize = 100;   // 每页加载的行数
 
-    // IndexedDB 数据库和对象存储名称
     const dbName = "NovelDB";
     const storeName = "novels";
 
@@ -145,7 +142,7 @@
         const transaction = db.transaction([storeName], "readonly");
         const store = transaction.objectStore(storeName);
         const getRequest = store.get("novel_text");
-        getRequest.onsuccess = function(event) {
+        getRequest.onsuccess = function() {
           if (getRequest.result) {
             callback(getRequest.result.text);
           } else {
@@ -182,7 +179,6 @@
         alert("请上传 TXT 格式的小说文件！");
         return;
       }
-      
       // 重置阅读进度和清除旧缓存
       pageIndex = 0;
       localStorage.removeItem("novel_page");
@@ -205,9 +201,7 @@
       };
 
       reader.onload = function(e) {
-        // 将读取到的文本按行拆分
         fileContent = e.target.result.split("\n");
-        // 保存小说文本到 IndexedDB
         saveToIndexedDB(fileContent.join("\n"));
         progressBar.style.width = "100%";
         progressBar.innerText = "100%";
@@ -218,7 +212,7 @@
       reader.readAsText(file, "GBK");
     }
 
-    // 加载指定页并显示在文本框
+    // 加载指定页并显示在正文文本框中
     function loadPage(page) {
       if (!fileContent || fileContent.length === 0) {
         alert("尚未加载小说内容！");
@@ -241,17 +235,15 @@
         `📌 当前页：${pageIndex + 1}（行 ${pageIndex * batchSize + 1} - ${(pageIndex + 1) * batchSize}）`;
     }
 
-    // 加载下一页
     function loadNextPage() {
       loadPage(pageIndex + 1);
     }
 
-    // 加载上一页
     function loadPreviousPage() {
       loadPage(pageIndex - 1);
     }
 
-    // 将当前页码保存到 localStorage（小数据）
+    // 将当前页码保存到 localStorage
     function saveHistory() {
       localStorage.setItem("novel_page", pageIndex);
     }
@@ -284,13 +276,11 @@
       }
     }
 
-    // 清除缓存：既清除 IndexedDB 小说缓存，也清除 localStorage 中的阅读进度
     function clearCache() {
       clearIndexedDBCache();
       localStorage.removeItem("novel_page");
     }
 
-    // 搜索功能：搜索指定关键字并跳转到包含该关键字的页
     function searchText() {
       const query = document.getElementById("search-input").value.trim();
       if (!query) {
@@ -317,42 +307,42 @@
       }
     }
 
-    // 全屏功能：切换文本框容器全屏显示（通过 CSS 类模拟全屏）
-    // 同时，隐藏包含其他UI的容器（#ui-container），使大声朗读只朗读正文内容
-    function toggleFullScreen() {
-      const container = document.getElementById("text-container");
+    // 切换阅读模式：合并全屏和隐藏 UI 两大功能
+    // 进入阅读模式后，将 UI 容器隐藏，并让正文区域覆盖整个屏幕，同时添加退出按钮
+    // 退出阅读模式时恢复 UI
+    function toggleReadingMode() {
       const uiContainer = document.getElementById("ui-container");
-      container.classList.toggle("fullscreen");
-      if (container.classList.contains("fullscreen")) {
-        if (uiContainer) {
-          uiContainer.setAttribute("aria-hidden", "true");
+      const textContainer = document.getElementById("text-container");
+      const exitBtn = document.getElementById("exit-reading-btn");
+      if (!textContainer.classList.contains("reading-mode")) {
+        // 进入阅读模式：隐藏 UI
+        uiContainer.style.display = "none";
+        // 将正文区域变为全屏
+        textContainer.classList.add("reading-mode");
+        window.scrollTo(0, 0);
+        // 如果没有退出按钮，则添加
+        if (!exitBtn) {
+          const btn = document.createElement("button");
+          btn.id = "exit-reading-btn";
+          btn.innerText = "退出阅读模式";
+          btn.onclick = toggleReadingMode;
+          textContainer.appendChild(btn);
         }
       } else {
-        if (uiContainer) {
-          uiContainer.removeAttribute("aria-hidden");
+        // 退出阅读模式：移除全屏样式并恢复 UI
+        textContainer.classList.remove("reading-mode");
+        uiContainer.style.display = "";
+        const exitBtnExisting = document.getElementById("exit-reading-btn");
+        if (exitBtnExisting) {
+          exitBtnExisting.parentNode.removeChild(exitBtnExisting);
         }
       }
     }
-
-    // 添加键盘事件监听，按 Esc 键退出全屏（适用于电脑）
-    document.addEventListener("keydown", function(e) {
-      if (e.key === "Escape") {
-        const container = document.getElementById("text-container");
-        if (container.classList.contains("fullscreen")) {
-          container.classList.remove("fullscreen");
-          const uiContainer = document.getElementById("ui-container");
-          if (uiContainer) {
-            uiContainer.removeAttribute("aria-hidden");
-          }
-          console.log("退出全屏模式");
-        }
-      }
-    });
   </script>
 </head>
 <body>
 
-  <!-- 包含除正文外的所有界面控件 -->
+  <!-- UI 容器：包含所有控制性 UI -->
   <div id="ui-container">
     <h1 id="page-header">📖 本地小说听书 - IndexedDB 缓存 & 分页搜索</h1>
     <p id="cache-status">📥 请上传小说 TXT 文件</p>
@@ -368,7 +358,8 @@
     <button onclick="loadPreviousPage()">⬅️ 加载上一部分</button>
     <button onclick="loadNextPage()">加载下一部分 ➡️</button>
     <button onclick="clearCache()">🗑 清除缓存</button>
-    <button onclick="toggleFullScreen()">全屏文本框</button>
+    <!-- 切换阅读模式按钮 -->
+    <button onclick="toggleReadingMode()">切换阅读模式</button>
     <br><br>
     <label id="search-label">🔍 搜索内容：</label>
     <input type="text" id="search-input" placeholder="请输入搜索内容">
@@ -376,9 +367,8 @@
   </div>
 
   <p>📜 小说内容：</p>
-  <!-- 文本容器：包含文本框和退出全屏按钮 -->
+  <!-- 文本容器：包含正文文本 -->
   <div id="text-container">
-    <button id="exit-fullscreen-btn" onclick="toggleFullScreen()">退出全屏</button>
     <textarea id="text-content" readonly></textarea>
   </div>
 
