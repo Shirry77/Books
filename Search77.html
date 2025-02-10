@@ -2,6 +2,7 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
+  <!-- 设置视口，确保在移动设备上正确缩放 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>本地小说搜索 - IndexedDB 缓存 & 分页搜索</title>
   <style>
@@ -12,11 +13,18 @@
       padding: 20px;
       line-height: 1.8;
     }
-    /* UI 容器：包含所有功能性控件 */
+    /* UI 容器 */
     #ui-container {
       margin-bottom: 20px;
     }
-    /* 进度条样式 */
+    /* 分区样式 */
+    .section {
+      margin-bottom: 20px;
+      padding: 10px;
+      border: 1px solid #eee;
+      border-radius: 5px;
+    }
+    /* 进度条 */
     #progress-container {
       display: none;
       width: 100%;
@@ -37,6 +45,9 @@
       width: 100%;
       height: 300px;
       margin-top: 10px;
+      padding: 10px;
+      box-sizing: border-box;
+      resize: vertical;
       overflow-y: scroll;
     }
     button {
@@ -52,6 +63,12 @@
     input[type="text"] {
       padding: 5px;
       font-size: 16px;
+    }
+    .pagination-buttons {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 10px;
     }
   </style>
   <script>
@@ -311,34 +328,63 @@
         alert(`找到 “${query}” 在第 ${foundLine + 1} 行，已显示搜索结果第一页`);
       }
     }
+
+    // 复制文本框内容到剪贴板
+    function copyText() {
+      const text = document.getElementById("text-content").value;
+      if (!text) {
+        alert("文本为空！");
+        return;
+      }
+      navigator.clipboard.writeText(text)
+      .then(() => {
+        alert("文本已复制到剪贴板！");
+      })
+      .catch(err => {
+        alert("复制失败: " + err);
+      });
+    }
   </script>
 </head>
 <body onload="loadFromHistory()">
-  <!-- UI 容器：包含所有控制性 UI -->
+  <!-- UI 容器 -->
   <div id="ui-container">
-    <h1 id="page-header">📖 本地小说搜索 - IndexedDB 缓存 & 分页搜索</h1>
-    <p id="cache-status">📥 请上传小说 TXT 文件</p>
-    <input type="file" accept=".txt" onchange="handleFileUpload(event)">
-    <div id="progress-container">
-      <div id="progress-bar">0%</div>
+    <!-- 上传及缓存信息 -->
+    <div class="section" id="upload-section">
+      <h1 id="page-header">📖 本地小说搜索</h1>
+      <p id="cache-status">📥 请上传小说 TXT 文件</p>
+      <input type="file" accept=".txt" onchange="handleFileUpload(event)">
+      <div id="progress-container">
+        <div id="progress-bar">0%</div>
+      </div>
     </div>
-    <p id="history-message"></p>
-    <label id="batch-size-label">🔄 每页加载多少行：</label>
-    <input type="number" id="batch-size" value="100">
-    <button onclick="setBatchSize()">设置</button>
-    <br>
-    <button onclick="loadPreviousPage()">⬅️ 加载上一部分</button>
-    <button onclick="loadNextPage()">加载下一部分 ➡️</button>
-    <button onclick="clearCache()">🗑 清除缓存</button>
-    <br><br>
-    <label id="search-label">🔍 搜索内容：</label>
-    <input type="text" id="search-input" placeholder="请输入搜索内容">
-    &nbsp;&nbsp;
-    <label id="search-limit-label">显示结果行数：</label>
-    <input type="number" id="search-limit" value="100" style="width:80px;">
-    <button onclick="searchText()">搜索</button>
-    <br><br>
-    <textarea id="text-content" rows="10" cols="50"></textarea>
+    <!-- 分页控制 -->
+    <div class="section" id="pagination-section">
+      <p id="history-message"></p>
+      <label id="batch-size-label">🔄 每页加载多少行：</label>
+      <input type="number" id="batch-size" value="100" style="width:80px;">
+      <button onclick="setBatchSize()">设置</button>
+      <div class="pagination-buttons">
+        <button onclick="loadPreviousPage()">⬅️ 上一部分</button>
+        <button onclick="loadNextPage()">下一部分 ➡️</button>
+        <button onclick="clearCache()">🗑 清除缓存</button>
+      </div>
+    </div>
+    <!-- 搜索控制 -->
+    <div class="section" id="search-section">
+      <label id="search-label">🔍 搜索内容：</label>
+      <input type="text" id="search-input" placeholder="请输入搜索内容" style="width:60%;">
+      &nbsp;&nbsp;
+      <label id="search-limit-label">显示结果行数：</label>
+      <input type="number" id="search-limit" value="100" style="width:80px;">
+      <button onclick="searchText()">搜索</button>
+    </div>
+    <!-- 文本显示及复制 -->
+    <div class="section" id="text-section">
+      <textarea id="text-content" rows="10" cols="50"></textarea>
+      <br>
+      <button onclick="copyText()">复制到剪贴板</button>
+    </div>
   </div>
 </body>
 </html>
