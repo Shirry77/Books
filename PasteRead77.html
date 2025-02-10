@@ -2,52 +2,109 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
+  <!-- 设置视口，确保在移动设备上正确缩放 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>文本朗读 Demo</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    textarea { width: 100%; max-width: 600px; }
-    .control-group { margin: 10px 0; }
-    label { margin-right: 10px; }
+    /* 全屏布局，消除默认间距 */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f7f7f7;
+    }
+    /* 容器采用 Flex 布局，垂直排列 */
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    /* 顶部标题和控制区域，占用较少高度 */
+    .header {
+      background: #0078d4;
+      color: #fff;
+      padding: 6px 10px;
+      text-align: center;
+      font-size: 18px;
+    }
+    .controls {
+      background: #f0f0f0;
+      padding: 5px 10px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      font-size: 14px;
+    }
+    .controls label,
+    .controls select,
+    .controls input,
+    .controls button {
+      margin: 3px;
+    }
+    /* 为 range 控件设置简洁样式 */
+    .controls input[type="range"] {
+      width: 70px;
+    }
+    /* 文本区域占据剩余大部分空间 */
+    .content {
+      flex: 1;
+      padding: 5px 10px;
+    }
+    .content textarea {
+      width: 100%;
+      height: 100%;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      resize: none;
+      box-sizing: border-box;
+    }
+    /* 按钮风格统一且较大，便于触控 */
+    .controls button {
+      padding: 6px 10px;
+      background: #0078d4;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .controls button:active {
+      background: #005fa3;
+    }
   </style>
 </head>
 <body>
-  <h1>文本朗读 Demo</h1>
-  
-  <!-- 文本输入 -->
-  <div class="control-group">
-    <textarea id="text" rows="8" placeholder="在这里粘贴或输入文本..."></textarea>
-  </div>
-  
-  <!-- 朗读角色选择 -->
-  <div class="control-group">
-    <label for="voiceSelect">选择朗读角色:</label>
-    <select id="voiceSelect"></select>
-  </div>
-  
-  <!-- 参数控制 -->
-  <div class="control-group">
-    <label for="rate">速度:</label>
-    <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
-    <span id="rateValue">1</span>
-  </div>
-  
-  <div class="control-group">
-    <label for="pitch">音调:</label>
-    <input type="range" id="pitch" min="0" max="2" step="0.1" value="1">
-    <span id="pitchValue">1</span>
-  </div>
-  
-  <div class="control-group">
-    <label for="volume">音量:</label>
-    <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
-    <span id="volumeValue">1</span>
-  </div>
-  
-  <!-- 控制按钮 -->
-  <div class="control-group">
-    <button id="start">开始</button>
-    <button id="pause">暂停</button>
-    <button id="resume">继续</button>
+  <div class="container">
+    <!-- 顶部标题 -->
+    <div class="header">文本朗读 Demo</div>
+    
+    <!-- 控制区 -->
+    <div class="controls">
+      <!-- 语音选择 -->
+      <select id="voiceSelect"></select>
+      <!-- 参数调整：速率、音调、音量 -->
+      <label>速率:
+        <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
+      </label>
+      <label>音调:
+        <input type="range" id="pitch" min="0" max="2" step="0.1" value="1">
+      </label>
+      <label>音量:
+        <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
+      </label>
+      <!-- 控制按钮，完整显示文字 -->
+      <button id="start">开始</button>
+      <button id="pause">暂停</button>
+      <button id="resume">继续</button>
+    </div>
+    
+    <!-- 文本区域 -->
+    <div class="content">
+      <textarea id="text" placeholder="在这里粘贴或输入文本..."></textarea>
+    </div>
   </div>
   
   <script>
@@ -60,16 +117,25 @@
     let utterance = null;
     const voiceSelect = document.getElementById("voiceSelect");
 
-    // 填充朗读角色（语音列表）
+    // 填充朗读角色（语音列表），并默认选中包含 "xiaoxiao" 的语音
     function populateVoices() {
       const voices = synth.getVoices();
       voiceSelect.innerHTML = '';
+      let defaultFound = false;
       voices.forEach(voice => {
         const option = document.createElement("option");
         option.value = voice.name;
         option.textContent = `${voice.name} (${voice.lang})`;
         voiceSelect.appendChild(option);
+        // 如果语音名称包含 "xiaoxiao"，则设为默认语音（不区分大小写）
+        if (!defaultFound && voice.name.toLowerCase().includes("xiaoxiao")) {
+          voiceSelect.value = voice.name;
+          defaultFound = true;
+        }
       });
+      if (!defaultFound && voices.length > 0) {
+        voiceSelect.selectedIndex = 0;
+      }
     }
 
     // 初始化语音列表
@@ -77,17 +143,6 @@
     if (typeof synth.onvoiceschanged !== 'undefined') {
       synth.onvoiceschanged = populateVoices;
     }
-
-    // 实时更新参数显示
-    document.getElementById("rate").addEventListener("input", function() {
-      document.getElementById("rateValue").textContent = this.value;
-    });
-    document.getElementById("pitch").addEventListener("input", function() {
-      document.getElementById("pitchValue").textContent = this.value;
-    });
-    document.getElementById("volume").addEventListener("input", function() {
-      document.getElementById("volumeValue").textContent = this.value;
-    });
 
     // 开始朗读
     document.getElementById("start").addEventListener("click", function() {
