@@ -4,9 +4,8 @@
   <meta charset="UTF-8">
   <!-- 设置视口，确保在移动设备上正确缩放 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>文本朗读 Demo</title>
+  <title>文本朗读识别 Demo</title>
   <style>
-    /* 全屏布局及紧凑风格 */
     html, body {
       margin: 0;
       padding: 0;
@@ -37,16 +36,6 @@
       margin-bottom: 4px;
       align-items: center;
     }
-    .controls > * {
-      margin: 2px 0;
-    }
-    .controls input[type="text"],
-    .controls input[type="number"],
-    .controls input[type="file"],
-    .controls select {
-      padding: 2px 4px;
-      font-size: 14px;
-    }
     .controls button {
       padding: 4px 8px;
       font-size: 14px;
@@ -59,189 +48,138 @@
     .controls button:active {
       background: #005fa3;
     }
-    /* 禁用状态下的按钮样式 */
-    .controls button:disabled {
-      background: #ccc;
-      color: #666;
-      cursor: not-allowed;
-    }
-    /* 文本框区域为主体 */
-    #text {
+    .content {
       flex: 1;
-      width: 100%;
-      padding: 6px;
-      font-size: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    /* 每个区域作为一个折叠容器 */
+    .section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
       border: 1px solid #ccc;
       border-radius: 4px;
+    }
+    .section-header {
+      background: #0078d4;
+      color: #fff;
+      padding: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .section-content {
+      flex: 1;
+      padding: 6px;
+      overflow: auto;
+    }
+    /* 文本输入区与镜像区均取消自带边框，由容器的边框代替 */
+    #text, #readable {
+      width: 100%;
+      height: 100%;
+      font-size: 14px;
+      border: none;
+      outline: none;
       resize: none;
+    }
+    /* 朗读镜像区域保持白色背景 */
+    #readable {
+      background: #fff;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- 标题 -->
-    <div class="header">文本朗读 Demo</div>
+    <!-- 标题区域（通过 aria-hidden 排除朗读识别） -->
+    <div class="header" aria-hidden="true">文本朗读识别 Demo</div>
     
-    <!-- 控制区 -->
-    <div class="controls">
-      <label>语音检索:
-        <input type="text" id="voiceFilter" placeholder="输入关键字检索">
-      </label>
-      <select id="voiceSelect"></select>
-      <label>速率:
-        <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
-      </label>
-      <label>音调:
-        <input type="range" id="pitch" min="0" max="2" step="0.1" value="1">
-      </label>
-      <label>音量:
-        <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
-      </label>
-      <button id="start">开始</button>
-      <button id="pause">暂停</button>
-      <button id="resume">继续</button>
-      <!-- 粘贴按钮始终有效 -->
+    <!-- 控制区：粘贴和清空按钮，设置 aria-hidden 使其不被朗读 -->
+    <div class="controls" aria-hidden="true">
       <button id="paste">粘贴</button>
-      <button id="toggleMode">进入朗读模式</button>
+      <button id="clear">清空</button>
     </div>
     
-    <!-- 文本框区域 -->
-    <textarea id="text" placeholder="在这里粘贴或输入文本..."></textarea>
+    <!-- 内容区：两个平分空间的折叠容器 -->
+    <div class="content">
+      <!-- 文本输入区域 -->
+      <div class="section" id="section-text">
+        <div class="section-header">
+          <span>输入文本</span>
+          <button class="toggle-button">折叠</button>
+        </div>
+        <div class="section-content">
+          <textarea id="text" placeholder="在这里粘贴或输入文本..."></textarea>
+        </div>
+      </div>
+      <!-- 朗读文本镜像区域 -->
+      <div class="section" id="section-readable">
+        <div class="section-header">
+          <span>朗读文本</span>
+          <button class="toggle-button">折叠</button>
+        </div>
+        <div class="section-content">
+          <div id="readable">这里会实时显示文本框内容</div>
+        </div>
+      </div>
+    </div>
   </div>
   
   <script>
-    if (!('speechSynthesis' in window)) {
-      alert("对不起，你的浏览器不支持语音朗读功能。");
-    }
-    
-    const synth = window.speechSynthesis;
-    let utterance = null;
-    const voiceSelect = document.getElementById("voiceSelect");
-    const voiceFilter = document.getElementById("voiceFilter");
-    let allVoices = [];
-    let readingMode = false;  // 当前是否处于朗读模式
-
-    // 获取并过滤语音列表
-    function populateVoices() {
-      allVoices = synth.getVoices();
-      filterVoices(voiceFilter.value);
-    }
-    
-    function filterVoices(filterText) {
-      const filter = filterText.toLowerCase();
-      voiceSelect.innerHTML = '';
-      let defaultFound = false;
-      const filteredVoices = allVoices.filter(voice => {
-        return voice.name.toLowerCase().includes(filter) || voice.lang.toLowerCase().includes(filter);
-      });
-      filteredVoices.forEach(voice => {
-        const option = document.createElement("option");
-        option.value = voice.name;
-        option.textContent = `${voice.name} (${voice.lang})`;
-        voiceSelect.appendChild(option);
-        // 默认选中第一个 lang 包含 "zh" 的语音
-        if (!defaultFound && voice.lang.toLowerCase().includes("zh")) {
-          voiceSelect.value = voice.name;
-          defaultFound = true;
-        }
-      });
-      if (!defaultFound && filteredVoices.length > 0) {
-        voiceSelect.selectedIndex = 0;
-      }
-    }
-    
-    voiceFilter.addEventListener("input", function() {
-      filterVoices(this.value);
+    // 同步文本输入区域内容到镜像区域
+    const textArea = document.getElementById("text");
+    const readableDiv = document.getElementById("readable");
+    textArea.addEventListener("input", () => {
+      readableDiv.textContent = textArea.value;
     });
     
-    populateVoices();
-    if (typeof synth.onvoiceschanged !== 'undefined') {
-      synth.onvoiceschanged = populateVoices;
-    }
-    
-    // 根据朗读模式启用/禁用相关控件，并将文本框设为只读状态（模拟静态文本效果）
-    function setReadingMode(enabled) {
-      // 排除粘贴按钮：无论模式如何，粘贴按钮始终保持可用
-      const controls = [
-        voiceSelect,
-        document.getElementById("rate"),
-        document.getElementById("pitch"),
-        document.getElementById("volume"),
-        document.getElementById("start"),
-        document.getElementById("pause"),
-        document.getElementById("resume")
-      ];
-      controls.forEach(el => {
-        el.disabled = !enabled;
-      });
-      
-      const textArea = document.getElementById("text");
-      textArea.readOnly = enabled;
-      if (enabled) {
-        // 修改样式让文本看起来更像静态文本
-        textArea.style.backgroundColor = "#eaeaea";
-        textArea.style.border = "none";
-      } else {
-        textArea.style.backgroundColor = "";
-        textArea.style.border = "1px solid #ccc";
-      }
-    }
-    
-    // 初始状态为编辑模式，朗读相关控件禁用，但粘贴按钮始终有效
-    setReadingMode(false);
-    
-    // 切换朗读模式按钮
-    document.getElementById("toggleMode").addEventListener("click", function() {
-      readingMode = !readingMode;
-      setReadingMode(readingMode);
-      this.textContent = readingMode ? "退出朗读模式" : "进入朗读模式";
-    });
-    
-    document.getElementById("start").addEventListener("click", function() {
-      if (!readingMode) {
-        alert("请先进入朗读模式！");
-        return;
-      }
-      if (synth.speaking) {
-        synth.cancel();
-      }
-      const text = document.getElementById("text").value.trim();
-      if (text !== "") {
-        utterance = new SpeechSynthesisUtterance(text);
-        // 明确设置中文朗读
-        utterance.lang = "zh-CN";
-        utterance.rate = parseFloat(document.getElementById("rate").value);
-        utterance.pitch = parseFloat(document.getElementById("pitch").value);
-        utterance.volume = parseFloat(document.getElementById("volume").value);
-        const selectedVoiceName = voiceSelect.value;
-        const voices = synth.getVoices();
-        const selectedVoice = voices.find(voice => voice.name === selectedVoiceName);
-        if (selectedVoice) {
-          utterance.voice = selectedVoice;
-        }
-        synth.speak(utterance);
-      }
-    });
-    
-    document.getElementById("pause").addEventListener("click", function() {
-      if (synth.speaking && !synth.paused) {
-        synth.pause();
-      }
-    });
-    
-    document.getElementById("resume").addEventListener("click", function() {
-      if (synth.paused) {
-        synth.resume();
-      }
-    });
-    
+    // 粘贴按钮：从剪贴板读取文本并更新文本区域
     document.getElementById("paste").addEventListener("click", function() {
       navigator.clipboard.readText()
       .then(text => {
-        document.getElementById("text").value = text;
+        textArea.value = text;
+        readableDiv.textContent = text;
       })
       .catch(err => {
         alert("粘贴失败：" + err);
+      });
+    });
+    
+    // 清空按钮：清空文本输入和镜像区域内容
+    document.getElementById("clear").addEventListener("click", function() {
+      textArea.value = "";
+      readableDiv.textContent = "";
+    });
+    
+    // 折叠/展开功能：点击按钮或标题区域（除按钮部分）切换对应区域内容显示状态
+    const toggleButtons = document.querySelectorAll('.toggle-button');
+    toggleButtons.forEach(button => {
+      button.addEventListener('click', function(event) {
+        // 防止点击按钮时触发整个 header 的点击事件
+        event.stopPropagation();
+        const section = this.closest('.section');
+        const content = section.querySelector('.section-content');
+        if (content.style.display === 'none') {
+          content.style.display = 'block';
+          this.textContent = '折叠';
+        } else {
+          content.style.display = 'none';
+          this.textContent = '展开';
+        }
+      });
+    });
+    
+    // 点击 header 区域（除按钮）也可切换折叠状态
+    const sectionHeaders = document.querySelectorAll('.section-header');
+    sectionHeaders.forEach(header => {
+      header.addEventListener('click', function(event) {
+        // 避免点击按钮时重复触发
+        if (event.target.tagName.toLowerCase() === 'button') return;
+        const button = this.querySelector('.toggle-button');
+        button.click();
       });
     });
   </script>
