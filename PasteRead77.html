@@ -20,7 +20,6 @@
       height: 100vh;
       padding: 4px;
     }
-    /* 标题较小 */
     .header {
       font-size: 16px;
       text-align: center;
@@ -30,7 +29,6 @@
       border-radius: 4px;
       margin-bottom: 4px;
     }
-    /* 控制区紧凑排列 */
     .controls {
       display: flex;
       flex-wrap: wrap;
@@ -78,7 +76,7 @@
     <!-- 标题 -->
     <div class="header">文本朗读 Demo</div>
     
-    <!-- 控制区：语音检索、选择、参数、操作按钮 -->
+    <!-- 控制区 -->
     <div class="controls">
       <label>语音检索:
         <input type="text" id="voiceFilter" placeholder="输入关键字检索">
@@ -93,7 +91,6 @@
       <label>音量:
         <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
       </label>
-      <!-- 操作按钮 -->
       <button id="start">开始</button>
       <button id="pause">暂停</button>
       <button id="resume">继续</button>
@@ -105,7 +102,6 @@
   </div>
   
   <script>
-    // 检查浏览器是否支持 SpeechSynthesis
     if (!('speechSynthesis' in window)) {
       alert("对不起，你的浏览器不支持语音朗读功能。");
     }
@@ -114,15 +110,13 @@
     let utterance = null;
     const voiceSelect = document.getElementById("voiceSelect");
     const voiceFilter = document.getElementById("voiceFilter");
-    let allVoices = []; // 保存所有语音
+    let allVoices = [];
 
-    // 填充语音列表，并保存到 allVoices，然后调用过滤函数
     function populateVoices() {
       allVoices = synth.getVoices();
       filterVoices(voiceFilter.value);
     }
 
-    // 根据输入关键字过滤语音列表，默认选中 lang 包含 "zh" 的语音
     function filterVoices(filterText) {
       const filter = filterText.toLowerCase();
       voiceSelect.innerHTML = '';
@@ -135,6 +129,7 @@
         option.value = voice.name;
         option.textContent = `${voice.name} (${voice.lang})`;
         voiceSelect.appendChild(option);
+        // 默认选中第一个 lang 包含 "zh" 的语音
         if (!defaultFound && voice.lang.toLowerCase().includes("zh")) {
           voiceSelect.value = voice.name;
           defaultFound = true;
@@ -145,7 +140,6 @@
       }
     }
 
-    // 监听语音检索输入变化
     voiceFilter.addEventListener("input", function() {
       filterVoices(this.value);
     });
@@ -155,7 +149,6 @@
       synth.onvoiceschanged = populateVoices;
     }
 
-    // 开始朗读
     document.getElementById("start").addEventListener("click", function() {
       if (synth.speaking) {
         synth.cancel();
@@ -163,6 +156,8 @@
       const text = document.getElementById("text").value.trim();
       if (text !== "") {
         utterance = new SpeechSynthesisUtterance(text);
+        // 明确设置中文朗读
+        utterance.lang = "zh-CN";
         utterance.rate = parseFloat(document.getElementById("rate").value);
         utterance.pitch = parseFloat(document.getElementById("pitch").value);
         utterance.volume = parseFloat(document.getElementById("volume").value);
@@ -176,21 +171,18 @@
       }
     });
 
-    // 暂停朗读
     document.getElementById("pause").addEventListener("click", function() {
       if (synth.speaking && !synth.paused) {
         synth.pause();
       }
     });
 
-    // 继续朗读
     document.getElementById("resume").addEventListener("click", function() {
       if (synth.paused) {
         synth.resume();
       }
     });
 
-    // 从剪贴板粘贴内容到文本框
     document.getElementById("paste").addEventListener("click", function() {
       navigator.clipboard.readText()
       .then(text => {
