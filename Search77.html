@@ -2,90 +2,161 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
-  <!-- 设置视口，确保在移动设备上正确缩放 -->
+  <!-- 保证移动端按设备宽度缩放 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>本地小说搜索 - IndexedDB 缓存 & 分页搜索</title>
+  <title>本地小说搜索</title>
   <style>
+    * { box-sizing: border-box; }
     body {
+      margin: 0;
+      padding: 0;
       font-family: Arial, sans-serif;
+      background: #f7f7f7;
+    }
+    /* 主容器：最大宽度600px，居中显示，采用Flex布局垂直排列，占满整个视口 */
+    #ui-container {
       max-width: 600px;
       margin: auto;
-      padding: 20px;
-      line-height: 1.8;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 4px;
     }
-    /* UI 容器 */
-    #ui-container {
-      margin-bottom: 20px;
+    /* 头部区域：标题较小 */
+    #header {
+      font-size: 16px;
+      text-align: center;
+      padding: 4px;
+      background: #0078d4;
+      color: #fff;
+      border-radius: 4px;
+      margin-bottom: 4px;
     }
-    /* 分区样式 */
-    .section {
-      margin-bottom: 20px;
-      padding: 10px;
-      border: 1px solid #eee;
-      border-radius: 5px;
+    /* 控制区：采用Flex布局，尽量紧凑排列 */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      font-size: 14px;
+      margin-bottom: 4px;
+      align-items: center;
     }
-    /* 进度条 */
+    .controls > * {
+      margin: 2px 0;
+    }
+    .controls input[type="text"],
+    .controls input[type="number"],
+    .controls input[type="file"],
+    .controls select {
+      padding: 2px 4px;
+      font-size: 14px;
+    }
+    .controls button {
+      padding: 4px 8px;
+      font-size: 14px;
+      background: #0078d4;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .controls button:active {
+      background: #005fa3;
+    }
+    /* 文本框区域：占据剩余空间 */
+    #text-content {
+      flex: 1;
+      width: 100%;
+      padding: 6px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      resize: none;
+    }
+    /* 进度条及辅助信息 */
     #progress-container {
       display: none;
       width: 100%;
       background: #eee;
-      border-radius: 5px;
-      margin: 10px 0;
+      border-radius: 4px;
+      margin: 2px 0;
     }
     #progress-bar {
-      width: 0%;
-      height: 20px;
+      height: 16px;
       background: #0078d4;
-      color: white;
+      color: #fff;
       text-align: center;
-      border-radius: 5px;
-      transition: width 0.3s ease-in-out;
+      border-radius: 4px;
+      transition: width 0.3s ease;
     }
-    textarea {
-      width: 100%;
-      height: 300px;
-      margin-top: 10px;
-      padding: 10px;
-      box-sizing: border-box;
-      resize: vertical;
-      overflow-y: scroll;
-    }
-    button {
-      padding: 10px;
-      font-size: 16px;
-      background: #0078d4;
-      color: white;
-      border: none;
-      cursor: pointer;
-      margin: 5px 0;
-    }
-    input[type="number"],
-    input[type="text"] {
-      padding: 5px;
-      font-size: 16px;
-    }
-    .pagination-buttons {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      margin-top: 10px;
+    #history-message {
+      font-size: 12px;
+      color: #333;
     }
   </style>
+</head>
+<body onload="loadFromHistory()">
+  <div id="ui-container">
+    <!-- 头部：标题 -->
+    <div id="header">本地小说搜索</div>
+    
+    <!-- 上传及缓存信息 -->
+    <div class="controls">
+      <input type="file" accept=".txt" onchange="handleFileUpload(event)">
+      <span id="cache-status">📥 未缓存</span>
+    </div>
+    <div id="progress-container">
+      <div id="progress-bar">0%</div>
+    </div>
+    
+    <!-- 分页控制：行数设置、上一页、下一页、清缓存 -->
+    <div class="controls">
+      <span id="history-message"></span>
+      <label>每页行数:
+        <input type="number" id="batch-size" value="100" style="width:60px;">
+      </label>
+      <button onclick="setBatchSize()">设置</button>
+      <button onclick="loadPreviousPage()">← 上一页</button>
+      <button onclick="loadNextPage()">下一页 →</button>
+      <button onclick="clearCache()">清理缓存</button>
+    </div>
+    
+    <!-- 搜索控制 -->
+    <div class="controls">
+      <label>搜索:
+        <input type="text" id="search-input" placeholder="搜索内容" style="width:120px;">
+      </label>
+      <label>显行数:
+        <input type="number" id="search-limit" value="100" style="width:60px;">
+      </label>
+      <button onclick="searchText()">搜索</button>
+    </div>
+    
+    <!-- 主体文本区域 -->
+    <textarea id="text-content" placeholder="小说内容..."></textarea>
+    
+    <!-- 复制按钮 -->
+    <div class="controls">
+      <button onclick="copyText()">复制文本</button>
+    </div>
+  </div>
+  
   <script>
+    // 以下代码保持原有功能：IndexedDB 缓存、全文分页、搜索分页、复制剪贴板等
+
     let fileContent = "";  // 小说内容（按行存储，数组形式）
     let pageIndex = 0;     // 当前全文分页页码，从 0 开始
     let batchSize = 100;   // 每页加载的全文行数
 
-    // 以下变量用于搜索模式下的分页
+    // 搜索模式下的分页变量
     let searchMode = false;      // 是否处于搜索模式
-    let searchStartLine = 0;     // 搜索结果起始行（在 fileContent 中的行号）
-    let searchPageIndex = 0;     // 搜索结果的当前页，从 0 开始
-    const defaultSearchLimit = 100; // 默认搜索结果每页显示行数
+    let searchStartLine = 0;     // 搜索结果起始行
+    let searchPageIndex = 0;     // 搜索结果当前页，从 0 开始
+    const defaultSearchLimit = 100; // 默认搜索结果每页行数
 
     const dbName = "NovelDB";
     const storeName = "novels";
 
-    // 打开或创建 IndexedDB 数据库
     function openDB(callback) {
       const request = indexedDB.open(dbName, 1);
       request.onupgradeneeded = function(event) {
@@ -102,7 +173,6 @@
       };
     }
 
-    // 将小说文本保存到 IndexedDB
     function saveToIndexedDB(novelText) {
       openDB(function(db) {
         const transaction = db.transaction([storeName], "readwrite");
@@ -110,7 +180,7 @@
         store.put({ id: "novel_text", text: novelText });
         transaction.oncomplete = function() {
           console.log("小说已保存到 IndexedDB");
-          document.getElementById("cache-status").innerText = "✅ 小说已缓存 (IndexedDB)";
+          document.getElementById("cache-status").innerText = "✅ 已缓存";
           loadFromHistory();
         };
         transaction.onerror = function(event) {
@@ -119,7 +189,6 @@
       });
     }
 
-    // 从 IndexedDB 读取小说文本
     function loadFromIndexedDB(callback) {
       openDB(function(db) {
         const transaction = db.transaction([storeName], "readonly");
@@ -139,15 +208,14 @@
       });
     }
 
-    // 清除 IndexedDB 中的小说缓存
     function clearIndexedDBCache() {
       openDB(function(db) {
         const transaction = db.transaction([storeName], "readwrite");
         const store = transaction.objectStore(storeName);
         store.delete("novel_text");
         transaction.oncomplete = function() {
-          alert("✅ 缓存已清除，下次需要重新上传小说！");
-          document.getElementById("cache-status").innerText = "📥 小说未缓存";
+          alert("✅ 缓存已清除！");
+          document.getElementById("cache-status").innerText = "📥 未缓存";
           document.getElementById("history-message").innerText = "";
           fileContent = "";
           pageIndex = 0;
@@ -157,14 +225,12 @@
       });
     }
 
-    // 处理本地文件上传，并缓存到 IndexedDB
     function handleFileUpload(event) {
       const file = event.target.files[0];
       if (!file || file.type !== "text/plain") {
         alert("请上传 TXT 格式的小说文件！");
         return;
       }
-      // 重置阅读进度和清除旧缓存
       pageIndex = 0;
       localStorage.removeItem("novel_page");
       clearIndexedDBCache();
@@ -186,7 +252,6 @@
       };
 
       reader.onload = function(e) {
-        // 将文本内容按行分割成数组
         fileContent = e.target.result.split("\n");
         saveToIndexedDB(fileContent.join("\n"));
         progressBar.style.width = "100%";
@@ -194,12 +259,9 @@
         progressContainer.style.display = "none";
       };
 
-      // 根据实际文件编码选择 "UTF-8" 或 "GBK"（此处假设文件为 GBK 编码）
       reader.readAsText(file, "GBK");
     }
 
-    // 全文分页：加载指定页并显示在文本框中
-    // 注意：当进行全文分页时，会退出搜索模式
     function loadPage(page) {
       if (!fileContent || fileContent.length === 0) {
         alert("尚未加载小说内容！");
@@ -213,7 +275,6 @@
         alert("已经到最后一页了！");
         return;
       }
-      // 退出搜索模式
       searchMode = false;
       pageIndex = page;
       const textArea = document.getElementById("text-content");
@@ -221,12 +282,11 @@
       textArea.value = pageContent;
       saveHistory();
       document.getElementById("history-message").innerText =
-        `📌 当前页：${pageIndex + 1}（行 ${pageIndex * batchSize + 1} - ${(pageIndex + 1) * batchSize}）`;
+        `📌 页：${pageIndex + 1}（行 ${pageIndex * batchSize + 1}-${(pageIndex + 1) * batchSize}）`;
     }
 
     function loadNextPage() {
       if (searchMode) {
-        // 搜索模式下分页
         const searchLimit = parseInt(document.getElementById("search-limit").value) || defaultSearchLimit;
         if (searchStartLine + (searchPageIndex + 1) * searchLimit >= fileContent.length) {
           alert("搜索结果已到最后一页！");
@@ -252,17 +312,15 @@
       }
     }
 
-    // 将当前页码保存到 localStorage
     function saveHistory() {
       localStorage.setItem("novel_page", pageIndex);
     }
 
-    // 从 IndexedDB 和 localStorage 加载小说及历史页码
     function loadFromHistory() {
       loadFromIndexedDB(function(cachedText) {
         if (cachedText) {
           fileContent = cachedText.split("\n");
-          document.getElementById("cache-status").innerText = "✅ 小说已缓存 (IndexedDB)";
+          document.getElementById("cache-status").innerText = "✅ 已缓存";
         }
         const savedPage = localStorage.getItem("novel_page");
         if (savedPage) {
@@ -274,14 +332,13 @@
       });
     }
 
-    // 设置每页加载的行数
     function setBatchSize() {
       const inputSize = parseInt(document.getElementById("batch-size").value);
       if (inputSize > 0) {
         batchSize = inputSize;
-        alert(`🔄 每页加载 ${batchSize} 行`);
+        alert(`每页加载 ${batchSize} 行`);
       } else {
-        alert("⚠️ 请输入有效数字");
+        alert("请输入有效数字");
       }
     }
 
@@ -290,7 +347,6 @@
       localStorage.removeItem("novel_page");
     }
 
-    // 显示搜索结果页：从 searchStartLine 开始，每页显示 searchLimit 行
     function displaySearchPage() {
       const searchLimit = parseInt(document.getElementById("search-limit").value) || defaultSearchLimit;
       const start = searchStartLine + searchPageIndex * searchLimit;
@@ -299,10 +355,9 @@
       textArea.value = fileContent.slice(start, end).join("\n");
       textArea.scrollTop = 0;
       document.getElementById("history-message").innerText =
-        `🔍 搜索结果：第 ${searchPageIndex + 1} 页（从第 ${start + 1} 行开始）`;
+        `🔍 搜索页：${searchPageIndex + 1}（从行 ${start + 1} 开始）`;
     }
 
-    // 搜索函数：查找包含目标字符串的行，并进入搜索模式分页显示
     function searchText() {
       const query = document.getElementById("search-input").value.trim();
       if (!query) {
@@ -313,7 +368,6 @@
         alert("小说内容尚未加载！");
         return;
       }
-      // 确保 fileContent 为数组（如果之前保存为字符串）
       if (typeof fileContent === "string") {
         fileContent = fileContent.split("\n");
       }
@@ -325,11 +379,10 @@
         searchStartLine = foundLine;
         searchPageIndex = 0;
         displaySearchPage();
-        alert(`找到 “${query}” 在第 ${foundLine + 1} 行，已显示搜索结果第一页`);
+        alert(`找到 “${query}” 在第 ${foundLine + 1} 行，显示搜索页1`);
       }
     }
 
-    // 复制文本框内容到剪贴板
     function copyText() {
       const text = document.getElementById("text-content").value;
       if (!text) {
@@ -337,54 +390,9 @@
         return;
       }
       navigator.clipboard.writeText(text)
-      .then(() => {
-        alert("文本已复制到剪贴板！");
-      })
-      .catch(err => {
-        alert("复制失败: " + err);
-      });
+      .then(() => { alert("文本已复制到剪贴板！"); })
+      .catch(err => { alert("复制失败: " + err); });
     }
   </script>
-</head>
-<body onload="loadFromHistory()">
-  <!-- UI 容器 -->
-  <div id="ui-container">
-    <!-- 上传及缓存信息 -->
-    <div class="section" id="upload-section">
-      <h1 id="page-header">📖 本地小说搜索</h1>
-      <p id="cache-status">📥 请上传小说 TXT 文件</p>
-      <input type="file" accept=".txt" onchange="handleFileUpload(event)">
-      <div id="progress-container">
-        <div id="progress-bar">0%</div>
-      </div>
-    </div>
-    <!-- 分页控制 -->
-    <div class="section" id="pagination-section">
-      <p id="history-message"></p>
-      <label id="batch-size-label">🔄 每页加载多少行：</label>
-      <input type="number" id="batch-size" value="100" style="width:80px;">
-      <button onclick="setBatchSize()">设置</button>
-      <div class="pagination-buttons">
-        <button onclick="loadPreviousPage()">⬅️ 上一部分</button>
-        <button onclick="loadNextPage()">下一部分 ➡️</button>
-        <button onclick="clearCache()">🗑 清除缓存</button>
-      </div>
-    </div>
-    <!-- 搜索控制 -->
-    <div class="section" id="search-section">
-      <label id="search-label">🔍 搜索内容：</label>
-      <input type="text" id="search-input" placeholder="请输入搜索内容" style="width:60%;">
-      &nbsp;&nbsp;
-      <label id="search-limit-label">显示结果行数：</label>
-      <input type="number" id="search-limit" value="100" style="width:80px;">
-      <button onclick="searchText()">搜索</button>
-    </div>
-    <!-- 文本显示及复制 -->
-    <div class="section" id="text-section">
-      <textarea id="text-content" rows="10" cols="50"></textarea>
-      <br>
-      <button onclick="copyText()">复制到剪贴板</button>
-    </div>
-  </div>
 </body>
 </html>
