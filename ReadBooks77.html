@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>本地小说听书 - IndexedDB 缓存 & 分页搜索</title>
+  <script>
+    let fileContent = "";  // 小说内容，按行存储（数组）
+    let pageIndex = 0;     // 当前页索引（从0开始）
+    let batchSize = 100;   // 每页加载的行数
+
+    // IndexedDB 数据库和对象存储名称
+    const dbName = "NovelDB";
+    const storeName = "novels";
+
+    // 打开或创建 IndexedDB 数据库
+    function openDB(callback) {
+      const request = indexedDB.open(dbName, 1);
+      request.onupgradeneeded = function(event) {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains(storeName)) {
+          db.createObjectStore(storeName, { keyPath: "id" });
+        }
+      };
+      request.onsuccess = function(event) {
+        callback(event.target.result);
+      };
+      request.onerror = function(event) {
+        console.error("IndexedDB 打开失败", event);
+      };
+    }
+
+    // 将小说文本保存到 IndexedDB
+    function saveToIndexedDB(novelText) {
+      openDB(function(db) {
+        const transaction = db.transaction([storeName], "readwrite");
+        const store = transaction.objectStore(storeName);
+        store.put({ id: "novel_text", text: novelText });
+        transaction.oncomplete = function() {
+          console.log("小说已保存到 IndexedDB");
+          document.getElementById("cache-status").innerText = "✅ 小说已缓存 (IndexedDB)";
+          loadFromHistory();
+        };
+        transaction.onerror = function(event) {
+          console.error("保存到 IndexedDB 出错", event);
+        };
+      });
+    }
+
+    // 从 IndexedDB 读取小说文本
+    function loadFromIndexedDB(callback) {
+      openDB(function(db) {
+        const transaction = db.transaction([storeName], "readonly");
+        const store = transaction.objectStore(storeName);
+        const getRequest = store.get("novel_text");
+        getRequest.onsuccess = function(event) {
+          if (getRequest.result) {
+            callback(getRequest.result.text);
+          } else {
+            callback(null);
+          }
+        };
+        getRequest.onerror = function(event) {
+          console.error("IndexedDB 读取错误", event);
+          callback(null);
+        };
+      });
+    }
+
+    // 清除 IndexedDB 中的小说缓存
+    function clearIndexedDBCache() {
+      openDB(function(db) {
+        const transaction = db.transaction([storeName], "readwrite");
+        const store = transaction.objectStore(storeName);
+        store.delete("novel_text");
+        transaction.oncomplete = function() {
+          alert("✅ 缓存已清除，下次需要重新上传小说！");
+          document.getElementById("cache-status").innerText = "📥 小说未缓存";
+          document.getElementById("history-message").innerText = "";
+          fileContent = "";
+          pageIndex = 0;
+        };
+      });
+    }
+
+    // 处理本地文件上传，并缓存到 IndexedDB
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file || file.type !== "text/plain") {
+        alert("请上传 TXT 格式的小说文件！");
+        return;
+      }
+      
+      // 重置阅读进度和清除旧缓存
+      pageIndex = 0;
+      localStorage.removeItem("novel_page");
+      clearIndexedDBCache();
+
+      const reader = new FileReader();
+      const progressBar = document.getElementById("progress-bar");
+      const progressContainer = document.getElementById("progress-container");
+      progressContainer.style.display = "block";
+      progressBar.style.width = "0%";
+      progressBar.innerText = "0%";
+      document.getElementById("cache-status").innerText = "📥 正在读取文件...";
+
+      reader.onprogress = function(event) {
+        if (event.lengthComputable) {
+          let percent = Math.round((event.loaded / event.total) * 100);
+          progressBar.style.width = percent + "%";
+          progressBar.innerText = percent + "%";
+        }
+      };
+
+      reader.onload = function(e) {
+        // 将读取到的文本按行拆分
+        fileContent = e.target.result.split("\n");
+        // 保存小说文本到 IndexedDB
+        saveToIndexedDB(fileContent.join("\n"));
+        progressBar.style.width = "100%";
+        progressBar.innerText = "100%";
+        progressContainer.style.display = "none";
+      };
+
+      // 根据实际文件编码选择 "UTF-8" 或 "GBK"（此处假设文件为 GBK 编码）
+      reader.readAsText(file, "GBK");
+    }
+
+    // 加载指定页并显示在文本框
+    function loadPage(page) {
+      if (!fileContent || fileContent.length === 0) {
+        alert("尚未加载小说内容！");
+        return;
+      }
+      if (page < 0) {
+        alert("已经是第一页了！");
+        return;
+      }
+      if (page * batchSize >= fileContent.length) {
+        alert("已经到最后一页了！");
+        return;
+      }
+      pageIndex = page;
+      const textArea = document.getElementById("text-content");
+      const pageContent = fileContent.slice(page * batchSize, (page + 1) * batchSize).join("\n");
+      textArea.value = pageContent;
+      saveHistory();
+      document.getElementById("history-message").innerText =
+        `📌 当前页：${pageIndex + 1}（行 ${pageIndex * batchSize + 1} - ${(pageIndex + 1) * batchSize}）`;
+    }
+
+    // 加载下一页
+    function loadNextPage() {
+      loadPage(pageIndex + 1);
+    }
+
+    // 加载上一页
+    function loadPreviousPage() {
+      loadPage(pageIndex - 1);
+    }
+
+    // 将当前页码保存到 localStorage（小数据）
+    function saveHistory() {
+      localStorage.setItem("novel_page", pageIndex);
+    }
+
+    // 从 IndexedDB 和 localStorage 加载小说及历史页码
+    function loadFromHistory() {
+      loadFromIndexedDB(function(cachedText) {
+        if (cachedText) {
+          fileContent = cachedText.split("\n");
+          document.getElementById("cache-status").innerText = "✅ 小说已缓存 (IndexedDB)";
+        }
+        const savedPage = localStorage.getItem("novel_page");
+        if (savedPage) {
+          pageIndex = parseInt(savedPage);
+          loadPage(pageIndex);
+        } else {
+          loadPage(0);
+        }
+      });
+    }
+
+    // 设置每页加载的行数
+    function setBatchSize() {
+      const inputSize = parseInt(document.getElementById("batch-size").value);
+      if (inputSize > 0) {
+        batchSize = inputSize;
+        alert(`🔄 每页加载 ${batchSize} 行`);
+      } else {
+        alert("⚠️ 请输入有效数字");
+      }
+    }
+
+    // 清除缓存：既清除 IndexedDB 小说缓存，也清除 localStorage 中的阅读进度
+    function clearCache() {
+      clearIndexedDBCache();
+      localStorage.removeItem("novel_page");
+    }
+
+    // 搜索功能：搜索指定关键字并跳转到包含该关键字的页
+    function searchText() {
+      const query = document.getElementById("search-input").value.trim();
+      if (!query) {
+        alert("请输入搜索内容！");
+        return;
+      }
+      if (!fileContent || fileContent.length === 0) {
+        alert("小说内容尚未加载！");
+        return;
+      }
+      let foundLine = -1;
+      for (let i = 0; i < fileContent.length; i++) {
+        if (fileContent[i].indexOf(query) !== -1) {
+          foundLine = i;
+          break;
+        }
+      }
+      if (foundLine === -1) {
+        alert("未找到相关内容！");
+      } else {
+        const targetPage = Math.floor(foundLine / batchSize);
+        loadPage(targetPage);
+        alert(`找到 “${query}” 在第 ${targetPage + 1} 页（约在第 ${foundLine + 1} 行）`);
+      }
+    }
+
+    // 全屏功能：切换文本框全屏显示
+    function toggleFullScreen() {
+      const textArea = document.getElementById("text-content");
+      if (!document.fullscreenElement) {
+        // 请求让文本框进入全屏
+        textArea.requestFullscreen().catch(err => {
+          alert(`全屏模式启动失败: ${err.message} (${err.name})`);
+        });
+      } else {
+        // 退出全屏
+        document.exitFullscreen();
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: auto;
+      padding: 20px;
+      line-height: 1.8;
+    }
+    #history-message {
+      color: green;
+    }
+    #progress-container {
+      display: none;
+      width: 100%;
+      background: #eee;
+      border-radius: 5px;
+      margin: 10px 0;
+    }
+    #progress-bar {
+      width: 0%;
+      height: 20px;
+      background: #0078d4;
+      color: white;
+      text-align: center;
+      border-radius: 5px;
+      transition: width 0.3s ease-in-out;
+    }
+    textarea {
+      width: 100%;
+      height: 300px;
+      margin-top: 10px;
+      overflow-y: scroll;
+    }
+    button {
+      padding: 10px;
+      font-size: 16px;
+      background: #0078d4;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin: 5px 0;
+    }
+    input[type="number"],
+    input[type="text"] {
+      padding: 5px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📖 本地小说听书 - IndexedDB 缓存 & 分页搜索</h1>
+  <p id="cache-status">📥 请上传小说 TXT 文件</p>
+  <input type="file" accept=".txt" onchange="handleFileUpload(event)">
+
+  <div id="progress-container">
+    <div id="progress-bar">0%</div>
+  </div>
+
+  <p id="history-message"></p>
+
+  <label>🔄 每页加载多少行：</label>
+  <input type="number" id="batch-size" value="100">
+  <button onclick="setBatchSize()">设置</button>
+
+  <br>
+  <button onclick="loadPreviousPage()">⬅️ 加载上一部分</button>
+  <button onclick="loadNextPage()">加载下一部分 ➡️</button>
+  <button onclick="clearCache()">🗑 清除缓存</button>
+  <button onclick="toggleFullScreen()">全屏文本框</button>
+
+  <br><br>
+  <label>🔍 搜索内容：</label>
+  <input type="text" id="search-input" placeholder="请输入搜索内容">
+  <button onclick="searchText()">搜索</button>
+
+  <p>📜 小说内容：</p>
+  <textarea id="text-content" readonly></textarea>
+
+</body>
+</html>
