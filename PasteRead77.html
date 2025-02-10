@@ -59,6 +59,12 @@
     .controls button:active {
       background: #005fa3;
     }
+    /* 禁用状态下的按钮样式 */
+    .controls button:disabled {
+      background: #ccc;
+      color: #666;
+      cursor: not-allowed;
+    }
     /* 文本框区域为主体 */
     #text {
       flex: 1;
@@ -94,7 +100,9 @@
       <button id="start">开始</button>
       <button id="pause">暂停</button>
       <button id="resume">继续</button>
+      <!-- 粘贴按钮始终有效 -->
       <button id="paste">粘贴</button>
+      <button id="toggleMode">进入朗读模式</button>
     </div>
     
     <!-- 文本框区域 -->
@@ -111,12 +119,14 @@
     const voiceSelect = document.getElementById("voiceSelect");
     const voiceFilter = document.getElementById("voiceFilter");
     let allVoices = [];
+    let readingMode = false;  // 当前是否处于朗读模式
 
+    // 获取并过滤语音列表
     function populateVoices() {
       allVoices = synth.getVoices();
       filterVoices(voiceFilter.value);
     }
-
+    
     function filterVoices(filterText) {
       const filter = filterText.toLowerCase();
       voiceSelect.innerHTML = '';
@@ -139,17 +149,59 @@
         voiceSelect.selectedIndex = 0;
       }
     }
-
+    
     voiceFilter.addEventListener("input", function() {
       filterVoices(this.value);
     });
-
+    
     populateVoices();
     if (typeof synth.onvoiceschanged !== 'undefined') {
       synth.onvoiceschanged = populateVoices;
     }
-
+    
+    // 根据朗读模式启用/禁用相关控件，并将文本框设为只读状态（模拟静态文本效果）
+    function setReadingMode(enabled) {
+      // 排除粘贴按钮：无论模式如何，粘贴按钮始终保持可用
+      const controls = [
+        voiceSelect,
+        document.getElementById("rate"),
+        document.getElementById("pitch"),
+        document.getElementById("volume"),
+        document.getElementById("start"),
+        document.getElementById("pause"),
+        document.getElementById("resume")
+      ];
+      controls.forEach(el => {
+        el.disabled = !enabled;
+      });
+      
+      const textArea = document.getElementById("text");
+      textArea.readOnly = enabled;
+      if (enabled) {
+        // 修改样式让文本看起来更像静态文本
+        textArea.style.backgroundColor = "#eaeaea";
+        textArea.style.border = "none";
+      } else {
+        textArea.style.backgroundColor = "";
+        textArea.style.border = "1px solid #ccc";
+      }
+    }
+    
+    // 初始状态为编辑模式，朗读相关控件禁用，但粘贴按钮始终有效
+    setReadingMode(false);
+    
+    // 切换朗读模式按钮
+    document.getElementById("toggleMode").addEventListener("click", function() {
+      readingMode = !readingMode;
+      setReadingMode(readingMode);
+      this.textContent = readingMode ? "退出朗读模式" : "进入朗读模式";
+    });
+    
     document.getElementById("start").addEventListener("click", function() {
+      if (!readingMode) {
+        alert("请先进入朗读模式！");
+        return;
+      }
       if (synth.speaking) {
         synth.cancel();
       }
@@ -170,19 +222,19 @@
         synth.speak(utterance);
       }
     });
-
+    
     document.getElementById("pause").addEventListener("click", function() {
       if (synth.speaking && !synth.paused) {
         synth.pause();
       }
     });
-
+    
     document.getElementById("resume").addEventListener("click", function() {
       if (synth.paused) {
         synth.resume();
       }
     });
-
+    
     document.getElementById("paste").addEventListener("click", function() {
       navigator.clipboard.readText()
       .then(text => {
