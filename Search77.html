@@ -126,19 +126,27 @@
       <label>搜索:
         <input type="text" id="search-input" placeholder="搜索内容" style="width:120px;">
       </label>
+	  
+	  
+	  
       <label>显行数:
         <input type="number" id="search-limit" value="100" style="width:60px;">
       </label>
       <button onclick="searchText()">搜索</button>
+	  
+	      <!-- 复制按钮 -->
+    <div class="controls">
+      <button onclick="copyText()">复制文本</button>
     </div>
+	  
+    </div>
+	
+	
     
     <!-- 主体文本区域 -->
     <textarea id="text-content" placeholder="小说内容..."></textarea>
     
-    <!-- 复制按钮 -->
-    <div class="controls">
-      <button onclick="copyText()">复制文本</button>
-    </div>
+
   </div>
   
   <script>
