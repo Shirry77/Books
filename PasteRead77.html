@@ -19,7 +19,7 @@
       height: 100vh;
       padding: 4px;
     }
-    /* 页面标题，本身为 UI，跳过朗读 */
+    /* 页面标题为 UI，不参与朗读 */
     .header {
       font-size: 16px;
       text-align: center;
@@ -29,7 +29,7 @@
       border-radius: 4px;
       margin-bottom: 4px;
     }
-    /* 控制区的按钮等均为 UI，不参与朗读 */
+    /* 控制区的按钮均为 UI，不参与朗读 */
     .controls {
       display: flex;
       flex-wrap: wrap;
@@ -74,6 +74,22 @@
       cursor: pointer;
       user-select: none;
     }
+    /* 新增的按钮容器 */
+    .header-buttons {
+      display: flex;
+      gap: 4px;
+    }
+    .header-buttons button {
+      padding: 2px 6px;
+      font-size: 12px;
+      background: #005fa3;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .header-buttons button:active {
+      background: #003f73;
+    }
     .section-content {
       flex: 1;
       padding: 6px;
@@ -89,7 +105,7 @@
       resize: none;
       overflow: auto;
     }
-    /* 朗读镜像区域保持白色背景 */
+    /* 朗读文本区域背景为白色 */
     #readable {
       background: #fff;
     }
@@ -100,7 +116,7 @@
     <!-- 页面标题 UI（跳过朗读） -->
     <div class="header" aria-hidden="true">文本朗读识别 Demo</div>
     
-    <!-- 控制区：粘贴和清空按钮（均跳过朗读） -->
+    <!-- 控制区：粘贴和清空按钮（跳过朗读） -->
     <div class="controls" aria-hidden="true">
       <button id="paste" aria-hidden="true">粘贴</button>
       <button id="clear" aria-hidden="true">清空</button>
@@ -118,11 +134,15 @@
           <textarea id="text" placeholder="在这里粘贴或输入文本..." aria-hidden="true"></textarea>
         </div>
       </div>
-      <!-- 朗读文本镜像区域：标题部分为 UI 跳过朗读，仅内容区域保留供朗读 -->
+      <!-- 朗读文本镜像区域：标题部分为 UI 跳过朗读，仅内容区域供朗读 -->
       <div class="section" id="section-readable">
         <div class="section-header" aria-hidden="true">
           <span>朗读文本</span>
-          <button class="toggle-button" aria-hidden="true">折叠</button>
+          <div class="header-buttons" aria-hidden="true">
+            <button class="font-decrease" aria-hidden="true">缩小</button>
+            <button class="font-increase" aria-hidden="true">放大</button>
+            <button class="toggle-button" aria-hidden="true">折叠</button>
+          </div>
         </div>
         <div class="section-content">
           <div id="readable">这里会实时显示文本框内容</div>
@@ -184,6 +204,24 @@
         const button = this.querySelector('.toggle-button');
         button.click();
       });
+    });
+    
+    // 字体放大缩小功能：初始字体大小设为16px，可在 12px 到 36px 之间调整
+    let currentFontSize = 16;
+    readableDiv.style.fontSize = currentFontSize + "px";
+    
+    document.querySelector(".font-increase").addEventListener("click", function(event) {
+      event.stopPropagation();
+      currentFontSize += 2;
+      if (currentFontSize > 36) currentFontSize = 36;
+      readableDiv.style.fontSize = currentFontSize + "px";
+    });
+    
+    document.querySelector(".font-decrease").addEventListener("click", function(event) {
+      event.stopPropagation();
+      currentFontSize -= 2;
+      if (currentFontSize < 12) currentFontSize = 12;
+      readableDiv.style.fontSize = currentFontSize + "px";
     });
   </script>
 </body>
