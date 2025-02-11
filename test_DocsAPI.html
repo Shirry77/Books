@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>测试生成谷歌文档（参数方式）</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    textarea { width: 100%; height: 200px; font-size: 16px; }
+    button { padding: 10px 20px; margin-top: 10px; font-size: 16px; cursor: pointer; }
+  </style>
+  
+  <script>
+    // 全局变量，用于保存用户输入的 API_KEY 和 CLIENT_ID
+    var API_KEY, CLIENT_ID;
+    
+    // 你可以使用 prompt 来让用户输入
+    function askForCredentials() {
+      API_KEY = prompt("请输入你的 API_KEY：", "");
+      CLIENT_ID = prompt("请输入你的 CLIENT_ID：", "");
+      if (!API_KEY || !CLIENT_ID) {
+        alert("必须输入 API_KEY 和 CLIENT_ID！");
+      }
+    }
+    
+    // 定义 Google API 初始化相关参数和函数
+    const DISCOVERY_DOCS = [
+      "https://docs.googleapis.com/$discovery/rest?version=v1",
+      "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"
+    ];
+    const SCOPES = "https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive";
+
+    function initGoogleAPI() {
+      console.log("initGoogleAPI: 开始加载 client:auth2 模块");
+      gapi.load('client:auth2', initClient);
+    }
+
+    function initClient() {
+      console.log("initClient: 开始初始化 Google API 客户端");
+      // 使用用户输入的 API_KEY 和 CLIENT_ID 进行初始化
+      gapi.client.init({
+        apiKey: API_KEY,
+        clientId: CLIENT_ID,
+        discoveryDocs: DISCOVERY_DOCS,
+        scope: SCOPES
+      }).then(function() {
+        console.log("initClient: Google API 初始化成功");
+        if (!gapi.auth2.getAuthInstance().isSignedIn.get()) {
+          console.log("initClient: 用户尚未登录，开始登录流程");
+          return gapi.auth2.getAuthInstance().signIn();
+        } else {
+          console.log("initClient: 用户已登录");
+        }
+      }).catch(function(error) {
+        console.error("initClient: 初始化失败", error);
+        alert("Google API 初始化失败，请检查凭据和授权来源设置。");
+      });
+    }
+  </script>
+  
+  <!-- 加载 Google API 脚本 -->
+  <script src="https://apis.google.com/js/api.js" onload="initGoogleAPI()"></script>
+  
+  <!-- 定义生成文档的函数，并添加调试日志 -->
+  <script>
+    function createTestDoc() {
+      console.log("createTestDoc: 按钮点击，开始生成文档");
+      const text = document.getElementById("inputText").value;
+      if (!text) {
+        console.error("createTestDoc: 没有输入文本");
+        alert("请输入一些文本");
+        return;
+      }
+      console.log("createTestDoc: 调用 gapi.client.docs.documents.create 创建文档");
+      gapi.client.docs.documents.create({
+        title: '测试文档'
+      }).then(function(response) {
+        console.log("createTestDoc: 文档创建成功", response);
+        const documentId = response.result.documentId;
+        window.createdDocumentId = documentId;
+        let requests = [{
+          insertText: {
+            location: { index: 1 },
+            text: text
+          }
+        }];
+        console.log("createTestDoc: 调用 batchUpdate 插入文本", requests);
+        return gapi.client.docs.documents.batchUpdate({
+          documentId: documentId,
+          requests: requests
+        }).then(function(updateResponse) {
+          console.log("createTestDoc: 文档内容更新成功", updateResponse);
+          console.log("createTestDoc: 设置共享权限");
+          return gapi.client.drive.permissions.create({
+            fileId: documentId,
+            resource: {
+              role: 'reader',
+              type: 'anyone'
+            }
+          }).then(function(permissionResponse) {
+            console.log("createTestDoc: 权限设置成功", permissionResponse);
+            const url = 'https://docs.google.com/document/d/' + documentId;
+            console.log("createTestDoc: 打开文档 URL:", url);
+            window.open(url, '_blank');
+          });
+        });
+      }).catch(function(error) {
+        console.error("createTestDoc: 生成文档失败", error);
+        alert("生成文档失败：" + error.message);
+      });
+    }
+    
+    // 页面加载时，先询问用户输入凭据
+    window.onload = function() {
+      askForCredentials();
+      // 如果需要，也可以在这里调用其他初始化逻辑
+    };
+  </script>
+</head>
+<body>
+  <h1>测试生成谷歌文档</h1>
+  <p>请输入一些文本：</p>
+  <textarea id="inputText" placeholder="在这里输入文本"></textarea>
+  <br>
+  <button onclick="createTestDoc()">生成谷歌文档</button>
+  <p>注意：OAuth 初始化需要你在 Google Cloud Console 中配置正确的授权来源。</p>
+</body>
+</html>
