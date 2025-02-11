@@ -126,41 +126,30 @@
       <label>搜索:
         <input type="text" id="search-input" placeholder="搜索内容" style="width:120px;">
       </label>
-	  
-	  
-	  
       <label>显行数:
         <input type="number" id="search-limit" value="100" style="width:60px;">
       </label>
       <button onclick="searchText()">搜索</button>
-	  
-	      <!-- 复制按钮 -->
-    <div class="controls">
+      <button onclick="clearSearchInput()">清空搜索框</button>
+      <button onclick="pasteClipboardToSearch()">粘贴剪贴板内容</button>
       <button onclick="copyText()">复制文本</button>
     </div>
-	  
-    </div>
-	
-	
     
     <!-- 主体文本区域 -->
     <textarea id="text-content" placeholder="小说内容..."></textarea>
-    
-
   </div>
   
+  <!-- 以下代码保持原有功能：IndexedDB 缓存、全文分页、搜索分页、复制剪贴板等 -->
   <script>
-    // 以下代码保持原有功能：IndexedDB 缓存、全文分页、搜索分页、复制剪贴板等
-
     let fileContent = "";  // 小说内容（按行存储，数组形式）
     let pageIndex = 0;     // 当前全文分页页码，从 0 开始
     let batchSize = 100;   // 每页加载的全文行数
 
     // 搜索模式下的分页变量
-    let searchMode = false;      // 是否处于搜索模式
-    let searchStartLine = 0;     // 搜索结果起始行
-    let searchPageIndex = 0;     // 搜索结果当前页，从 0 开始
-    const defaultSearchLimit = 100; // 默认搜索结果每页行数
+    let searchMode = false;
+    let searchStartLine = 0;
+    let searchPageIndex = 0;
+    const defaultSearchLimit = 100;
 
     const dbName = "NovelDB";
     const storeName = "novels";
@@ -400,6 +389,23 @@
       navigator.clipboard.writeText(text)
       .then(() => { alert("文本已复制到剪贴板！"); })
       .catch(err => { alert("复制失败: " + err); });
+    }
+
+    // 新增：清空搜索框功能
+    function clearSearchInput() {
+      document.getElementById("search-input").value = "";
+    }
+
+    // 新增：将剪贴板内容粘贴到搜索框功能
+    function pasteClipboardToSearch() {
+      navigator.clipboard.readText()
+      .then(text => {
+        document.getElementById("search-input").value = text;
+        alert("已粘贴剪贴板内容到搜索框！");
+      })
+      .catch(err => {
+        alert("粘贴失败: " + err);
+      });
     }
   </script>
 </body>
