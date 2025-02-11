@@ -19,7 +19,7 @@
       min-height: 100vh;
       padding: 4px;
     }
-    /* 页面标题为 UI，不参与朗读 */
+    /* 页面标题，仅为UI，不参与朗读 */
     .header {
       font-size: 16px;
       text-align: center;
@@ -29,7 +29,7 @@
       border-radius: 4px;
       margin-bottom: 4px;
     }
-    /* 控制区的按钮均为 UI，不参与朗读 */
+    /* 控制区（UI），不参与朗读 */
     .controls {
       display: flex;
       flex-wrap: wrap;
@@ -50,13 +50,6 @@
     .controls button:active {
       background: #005fa3;
     }
-    .content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    /* 每个区域作为一个折叠容器 */
     .section {
       border: 1px solid #ccc;
       border-radius: 4px;
@@ -72,7 +65,6 @@
       cursor: pointer;
       user-select: none;
     }
-    /* 按钮容器 */
     .header-buttons {
       display: flex;
       gap: 4px;
@@ -90,9 +82,8 @@
     }
     .section-content {
       padding: 6px;
-      /* 对于输入区域可以保持滚动，但对于朗读区域我们希望全部展开 */
     }
-    /* 输入区域样式 */
+    /* 输入区域：可滚动编辑 */
     #text {
       width: 100%;
       height: 100px;
@@ -103,42 +94,42 @@
       resize: vertical;
       overflow: auto;
     }
-    /* 朗读文本区域，取消滚动设置，使其自动扩展 */
+    /* 朗读区域：采用连续文本流，自动扩展高度，无内部滚动 */
     #readable {
       width: 100%;
       font-size: 14px;
-      /* 不限制高度，确保所有内容在同一页面中 */
-      height: auto;
       border: 1px solid #ccc;
       border-radius: 4px;
       padding: 4px;
       background: #fff;
+      /* height:auto 确保内容连续显示 */
+      height: auto;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- 页面标题（跳过朗读） -->
+    <!-- 页面标题（UI，不朗读） -->
     <div class="header" aria-hidden="true">文本朗读识别 Demo</div>
     
-    <!-- 控制区：粘贴和清空按钮（跳过朗读） -->
+    <!-- 控制区（UI，不朗读） -->
     <div class="controls" aria-hidden="true">
       <button id="paste" aria-hidden="true">粘贴</button>
       <button id="clear" aria-hidden="true">清空</button>
     </div>
     
-    <!-- 输入区域：用于文本输入，非朗读区域 -->
+    <!-- 输入区域：供用户编辑（UI部分，不参与 TTS 朗读） -->
     <div class="section" id="section-text" aria-hidden="true">
       <div class="section-header" aria-hidden="true">
         <span>输入文本</span>
         <button class="toggle-button" aria-hidden="true">折叠</button>
       </div>
-      <div class="section-content" aria-hidden="true">
+      <div class="section-content">
         <textarea id="text" placeholder="在这里粘贴或输入文本..."></textarea>
       </div>
     </div>
     
-    <!-- 朗读文本区域：采用语义化标签，让大声朗读功能能顺利读取 -->
+    <!-- 朗读区域：核心内容，使用语义化标签 -->
     <section class="section" id="section-readable">
       <div class="section-header" aria-hidden="true">
         <span>朗读文本</span>
@@ -148,8 +139,8 @@
           <button class="toggle-button" aria-hidden="true">折叠</button>
         </div>
       </div>
+      <!-- 这里采用 role="main" 表示主要朗读区域，确保 TTS 顺序读取 -->
       <div class="section-content" role="main">
-        <!-- 将朗读区域设置为连续的文本区域，避免内部滚动干扰 TTS -->
         <div id="readable">
           这里会实时显示文本框内容
         </div>
@@ -158,14 +149,15 @@
   </div>
   
   <script>
-    // 同步文本输入区域内容到朗读区域
+    // 同步输入区域与朗读区域
     const textArea = document.getElementById("text");
     const readableDiv = document.getElementById("readable");
     textArea.addEventListener("input", () => {
+      // 可考虑增加处理逻辑：例如按段落分隔、自动补充换行等
       readableDiv.textContent = textArea.value;
     });
     
-    // 粘贴按钮：从剪贴板读取文本并更新输入及朗读区域
+    // 粘贴按钮：从剪贴板读取文本并更新内容
     document.getElementById("paste").addEventListener("click", function() {
       navigator.clipboard.readText()
       .then(text => {
@@ -177,17 +169,17 @@
       });
     });
     
-    // 清空按钮：清空输入和朗读区域内容
+    // 清空按钮
     document.getElementById("clear").addEventListener("click", function() {
       textArea.value = "";
       readableDiv.textContent = "";
     });
     
-    // 折叠/展开功能：点击按钮或 header 切换显示状态
+    // 折叠/展开功能
     const toggleButtons = document.querySelectorAll('.toggle-button');
     toggleButtons.forEach(button => {
       button.addEventListener('click', function(event) {
-        event.stopPropagation(); // 防止冒泡触发 header 点击
+        event.stopPropagation();
         const section = this.closest('.section');
         const content = section.querySelector('.section-content');
         if (content.style.display === 'none') {
@@ -200,7 +192,6 @@
       });
     });
     
-    // 点击 header 也触发折叠/展开（除按钮区域外）
     const sectionHeaders = document.querySelectorAll('.section-header');
     sectionHeaders.forEach(header => {
       header.addEventListener('click', function(event) {
@@ -210,21 +201,19 @@
       });
     });
     
-    // 字体放大缩小功能：初始字体大小为16px，可在12px到36px之间调整
+    // 字体放大缩小功能
     let currentFontSize = 16;
     readableDiv.style.fontSize = currentFontSize + "px";
     
     document.querySelector(".font-increase").addEventListener("click", function(event) {
       event.stopPropagation();
-      currentFontSize += 2;
-      if (currentFontSize > 36) currentFontSize = 36;
+      currentFontSize = Math.min(currentFontSize + 2, 36);
       readableDiv.style.fontSize = currentFontSize + "px";
     });
     
     document.querySelector(".font-decrease").addEventListener("click", function(event) {
       event.stopPropagation();
-      currentFontSize -= 2;
-      if (currentFontSize < 12) currentFontSize = 12;
+      currentFontSize = Math.max(currentFontSize - 2, 12);
       readableDiv.style.fontSize = currentFontSize + "px";
     });
   </script>
