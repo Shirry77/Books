@@ -9,14 +9,14 @@
     html, body {
       margin: 0;
       padding: 0;
-      height: 100%;
+      min-height: 100%;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: #f7f7f7;
     }
     .container {
       display: flex;
       flex-direction: column;
-      height: 100vh;
+      min-height: 100vh;
       padding: 4px;
     }
     /* 页面标题为 UI，不参与朗读 */
@@ -58,11 +58,9 @@
     }
     /* 每个区域作为一个折叠容器 */
     .section {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
       border: 1px solid #ccc;
       border-radius: 4px;
+      margin-bottom: 8px;
     }
     .section-header {
       background: #0078d4;
@@ -74,7 +72,7 @@
       cursor: pointer;
       user-select: none;
     }
-    /* 新增的按钮容器 */
+    /* 按钮容器 */
     .header-buttons {
       display: flex;
       gap: 4px;
@@ -91,29 +89,36 @@
       background: #003f73;
     }
     .section-content {
-      flex: 1;
       padding: 6px;
-      overflow: auto;
+      /* 对于输入区域可以保持滚动，但对于朗读区域我们希望全部展开 */
     }
-    /* 文本输入区与镜像区取消自带边框，由容器边框代替 */
-    #text, #readable {
+    /* 输入区域样式 */
+    #text {
       width: 100%;
-      height: 100%;
+      height: 100px;
       font-size: 14px;
-      border: none;
-      outline: none;
-      resize: none;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 4px;
+      resize: vertical;
       overflow: auto;
     }
-    /* 朗读文本区域背景为白色 */
+    /* 朗读文本区域，取消滚动设置，使其自动扩展 */
     #readable {
+      width: 100%;
+      font-size: 14px;
+      /* 不限制高度，确保所有内容在同一页面中 */
+      height: auto;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 4px;
       background: #fff;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- 页面标题 UI（跳过朗读） -->
+    <!-- 页面标题（跳过朗读） -->
     <div class="header" aria-hidden="true">文本朗读识别 Demo</div>
     
     <!-- 控制区：粘贴和清空按钮（跳过朗读） -->
@@ -122,44 +127,45 @@
       <button id="clear" aria-hidden="true">清空</button>
     </div>
     
-    <!-- 内容区：两个平分空间的折叠容器 -->
-    <div class="content">
-      <!-- 文本输入区域（UI部分，跳过朗读） -->
-      <div class="section" id="section-text" aria-hidden="true">
-        <div class="section-header" aria-hidden="true">
-          <span>输入文本</span>
-          <button class="toggle-button" aria-hidden="true">折叠</button>
-        </div>
-        <div class="section-content" aria-hidden="true">
-          <textarea id="text" placeholder="在这里粘贴或输入文本..." aria-hidden="true"></textarea>
-        </div>
+    <!-- 输入区域：用于文本输入，非朗读区域 -->
+    <div class="section" id="section-text" aria-hidden="true">
+      <div class="section-header" aria-hidden="true">
+        <span>输入文本</span>
+        <button class="toggle-button" aria-hidden="true">折叠</button>
       </div>
-      <!-- 朗读文本镜像区域：标题部分为 UI 跳过朗读，仅内容区域供朗读 -->
-      <div class="section" id="section-readable">
-        <div class="section-header" aria-hidden="true">
-          <span>朗读文本</span>
-          <div class="header-buttons" aria-hidden="true">
-            <button class="font-decrease" aria-hidden="true">缩小</button>
-            <button class="font-increase" aria-hidden="true">放大</button>
-            <button class="toggle-button" aria-hidden="true">折叠</button>
-          </div>
-        </div>
-        <div class="section-content">
-          <div id="readable">这里会实时显示文本框内容</div>
-        </div>
+      <div class="section-content" aria-hidden="true">
+        <textarea id="text" placeholder="在这里粘贴或输入文本..."></textarea>
       </div>
     </div>
+    
+    <!-- 朗读文本区域：采用语义化标签，让大声朗读功能能顺利读取 -->
+    <section class="section" id="section-readable">
+      <div class="section-header" aria-hidden="true">
+        <span>朗读文本</span>
+        <div class="header-buttons" aria-hidden="true">
+          <button class="font-decrease" aria-hidden="true">缩小</button>
+          <button class="font-increase" aria-hidden="true">放大</button>
+          <button class="toggle-button" aria-hidden="true">折叠</button>
+        </div>
+      </div>
+      <div class="section-content" role="main">
+        <!-- 将朗读区域设置为连续的文本区域，避免内部滚动干扰 TTS -->
+        <div id="readable">
+          这里会实时显示文本框内容
+        </div>
+      </div>
+    </section>
   </div>
   
   <script>
-    // 同步文本输入区域内容到镜像区域
+    // 同步文本输入区域内容到朗读区域
     const textArea = document.getElementById("text");
     const readableDiv = document.getElementById("readable");
     textArea.addEventListener("input", () => {
       readableDiv.textContent = textArea.value;
     });
     
-    // 粘贴按钮：从剪贴板读取文本并更新文本区域
+    // 粘贴按钮：从剪贴板读取文本并更新输入及朗读区域
     document.getElementById("paste").addEventListener("click", function() {
       navigator.clipboard.readText()
       .then(text => {
@@ -171,18 +177,17 @@
       });
     });
     
-    // 清空按钮：清空文本输入和镜像区域内容
+    // 清空按钮：清空输入和朗读区域内容
     document.getElementById("clear").addEventListener("click", function() {
       textArea.value = "";
       readableDiv.textContent = "";
     });
     
-    // 折叠/展开功能：点击按钮或标题区域（除按钮部分）切换对应区域内容显示状态
+    // 折叠/展开功能：点击按钮或 header 切换显示状态
     const toggleButtons = document.querySelectorAll('.toggle-button');
     toggleButtons.forEach(button => {
       button.addEventListener('click', function(event) {
-        // 防止点击按钮时触发整个 header 的点击事件
-        event.stopPropagation();
+        event.stopPropagation(); // 防止冒泡触发 header 点击
         const section = this.closest('.section');
         const content = section.querySelector('.section-content');
         if (content.style.display === 'none') {
@@ -195,18 +200,17 @@
       });
     });
     
-    // 点击 header 区域（除按钮）也可切换折叠状态
+    // 点击 header 也触发折叠/展开（除按钮区域外）
     const sectionHeaders = document.querySelectorAll('.section-header');
     sectionHeaders.forEach(header => {
       header.addEventListener('click', function(event) {
-        // 避免点击按钮时重复触发
         if (event.target.tagName.toLowerCase() === 'button') return;
         const button = this.querySelector('.toggle-button');
         button.click();
       });
     });
     
-    // 字体放大缩小功能：初始字体大小设为16px，可在 12px 到 36px 之间调整
+    // 字体放大缩小功能：初始字体大小为16px，可在12px到36px之间调整
     let currentFontSize = 16;
     readableDiv.style.fontSize = currentFontSize + "px";
     
