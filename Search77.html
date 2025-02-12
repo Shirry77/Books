@@ -22,7 +22,7 @@
       height: 100vh;
       padding: 4px;
     }
-    /* 头部区域：标题较小 */
+    /* 头部区域 */
     #header {
       font-size: 16px;
       text-align: center;
@@ -32,7 +32,7 @@
       border-radius: 4px;
       margin-bottom: 4px;
     }
-    /* 控制区：采用Flex布局，尽量紧凑排列 */
+    /* 控制区 */
     .controls {
       display: flex;
       flex-wrap: wrap;
@@ -63,16 +63,6 @@
     .controls button:active {
       background: #005fa3;
     }
-    /* 文本框区域：占据剩余空间 */
-    #text-content {
-      flex: 1;
-      width: 100%;
-      padding: 6px;
-      font-size: 14px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      resize: none;
-    }
     /* 进度条及辅助信息 */
     #progress-container {
       display: none;
@@ -93,15 +83,54 @@
       font-size: 12px;
       color: #333;
     }
-    /* Google Doc 区域：默认隐藏，添加边框和内边距 */
+    /* 新增：文本区域容器（占据剩余空间） */
+    #text-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    /* 折叠按钮容器 */
+    #toggle-container {
+      text-align: right;
+      margin-bottom: 4px;
+    }
+    #toggle-google-doc {
+      padding: 4px 8px;
+      font-size: 14px;
+      background: #0078d4;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #toggle-google-doc:active {
+      background: #005fa3;
+    }
+    /* 主内容区域：左右并排 */
+    #main-content-container {
+      flex: 1;
+      display: flex;
+      gap: 4px;
+      height: 100%;
+    }
+    /* 搜索结果文本框 */
+    #text-content {
+      width: 50%;
+      height: 100%;
+      padding: 6px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      resize: none;
+    }
+    /* Google 文档区域 */
     #google-doc-container {
-      display: none; /* 默认隐藏 */
-      max-width: 600px;
-      margin: 20px auto;
-      padding: 4px;
+      width: 50%;
+      height: 100%;
       background: #fff;
       border: 1px solid #ccc;
       border-radius: 4px;
+      display: block; /* 默认显示 */
     }
     #google-doc-container h3 {
       margin: 0;
@@ -114,7 +143,7 @@
     }
     #google-doc-container iframe {
       width: 100%;
-      height: 500px;
+      height: calc(100% - 40px); /* 减去标题区域高度 */
       border: none;
     }
   </style>
@@ -158,19 +187,24 @@
       <button onclick="pasteClipboardToSearch()">粘贴剪贴板内容</button>
       <button onclick="copyText()">复制文本</button>
       <button onclick="pasteClipboardAndUpdate()">从剪贴板覆盖文本到谷歌文档</button>
-      <button onclick="toggleGoogleDoc()">📑 显示/隐藏 Google Docs</button>
     </div>
     
-    <!-- 主体文本区域 -->
-    <textarea id="text-content" placeholder="小说内容..."></textarea>
+    <!-- 新的文本区域容器：包含折叠按钮和左右并排的文本框与 Google 文档 -->
+    <div id="text-container">
+      <!-- 折叠按钮整合到文本框上方 -->
+      <div id="toggle-container">
+        <button id="toggle-google-doc" onclick="toggleGoogleDoc()">📑 隐藏 Google Docs</button>
+      </div>
+      <div id="main-content-container">
+        <textarea id="text-content" placeholder="小说内容..."></textarea>
+        <div id="google-doc-container">
+          <h3>Google 文档（可直接编辑）</h3>
+          <iframe id="googleDocFrame" src="https://docs.google.com/document/d/1TqltztF99cT6wiK082XZAiubuZzzhyEXcQCkyBmBTdA/edit"></iframe>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- Google 文档区域 -->
-  <div id="google-doc-container">
-    <h3>Google 文档（可直接编辑）</h3>
-    <iframe id="googleDocFrame" src="https://docs.google.com/document/d/1TqltztF99cT6wiK082XZAiubuZzzhyEXcQCkyBmBTdA/edit"></iframe>
-  </div>
-  
   <!-- 以下代码保持原有功能：IndexedDB 缓存、全文分页、搜索分页、复制剪贴板等 -->
   <script>
     let fileContent = "";  // 小说内容（按行存储）
@@ -460,11 +494,22 @@
       });
     }
 
+    // 折叠/显示 Google 文档区域：同时调整文本框宽度
     function toggleGoogleDoc() {
-      const container = document.getElementById("google-doc-container");
-      // 采用 getComputedStyle 检查当前实际显示状态
-      const currentDisplay = window.getComputedStyle(container).display;
-      container.style.display = currentDisplay === "none" ? "block" : "none";
+      const googleDoc = document.getElementById("google-doc-container");
+      const textContent = document.getElementById("text-content");
+      const toggleButton = document.getElementById("toggle-google-doc");
+      if (googleDoc.style.display === "none") {
+        // 显示 Google Doc 区域
+        googleDoc.style.display = "block";
+        textContent.style.width = "50%";
+        toggleButton.innerText = "📑 隐藏 Google Docs";
+      } else {
+        // 隐藏 Google Doc 区域
+        googleDoc.style.display = "none";
+        textContent.style.width = "100%";
+        toggleButton.innerText = "📑 显示 Google Docs";
+      }
     }
   </script>
 </body>
