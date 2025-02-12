@@ -93,6 +93,30 @@
       font-size: 12px;
       color: #333;
     }
+    /* Google Doc 区域：默认隐藏，添加边框和内边距 */
+    #google-doc-container {
+      display: none; /* 默认隐藏 */
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 4px;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    #google-doc-container h3 {
+      margin: 0;
+      padding: 8px;
+      background: #0078d4;
+      color: #fff;
+      font-size: 16px;
+      border-top-left-radius: 4px;
+      border-top-right-radius: 4px;
+    }
+    #google-doc-container iframe {
+      width: 100%;
+      height: 500px;
+      border: none;
+    }
   </style>
 </head>
 <body onload="loadFromHistory()">
@@ -133,15 +157,23 @@
       <button onclick="clearSearchInput()">清空搜索框</button>
       <button onclick="pasteClipboardToSearch()">粘贴剪贴板内容</button>
       <button onclick="copyText()">复制文本</button>
+      <button onclick="pasteClipboardAndUpdate()">从剪贴板覆盖文本到谷歌文档</button>
+      <button onclick="toggleGoogleDoc()">📑 显示/隐藏 Google Docs</button>
     </div>
     
     <!-- 主体文本区域 -->
     <textarea id="text-content" placeholder="小说内容..."></textarea>
   </div>
+
+  <!-- Google 文档区域 -->
+  <div id="google-doc-container">
+    <h3>Google 文档（可直接编辑）</h3>
+    <iframe id="googleDocFrame" src="https://docs.google.com/document/d/1TqltztF99cT6wiK082XZAiubuZzzhyEXcQCkyBmBTdA/edit"></iframe>
+  </div>
   
   <!-- 以下代码保持原有功能：IndexedDB 缓存、全文分页、搜索分页、复制剪贴板等 -->
   <script>
-    let fileContent = "";  // 小说内容（按行存储，数组形式）
+    let fileContent = "";  // 小说内容（按行存储）
     let pageIndex = 0;     // 当前全文分页页码，从 0 开始
     let batchSize = 100;   // 每页加载的全文行数
 
@@ -391,12 +423,10 @@
       .catch(err => { alert("复制失败: " + err); });
     }
 
-    // 新增：清空搜索框功能
     function clearSearchInput() {
       document.getElementById("search-input").value = "";
     }
 
-    // 新增：将剪贴板内容粘贴到搜索框功能
     function pasteClipboardToSearch() {
       navigator.clipboard.readText()
       .then(text => {
@@ -406,6 +436,35 @@
       .catch(err => {
         alert("粘贴失败: " + err);
       });
+    }
+
+    const apiUrl = "https://script.google.com/macros/s/AKfycbx5-6aEkQvtFdcMalKLiPWQrkV9iPophh3FVx9ENa-X9J_6oIk1jC-55MiUdwicd8Em6g/exec";
+
+    function pasteClipboardAndUpdate() {
+      navigator.clipboard.readText().then(text => {
+        if (!text) {
+          alert("剪贴板为空，请先复制内容！");
+          return;
+        }
+        
+        fetch(apiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ text: text })
+        })
+        .then(response => response.json())
+        .then(data => alert(data.message))
+        .catch(error => alert("发生错误：" + error));
+      }).catch(err => {
+        alert("无法访问剪贴板：" + err);
+      });
+    }
+
+    function toggleGoogleDoc() {
+      const container = document.getElementById("google-doc-container");
+      // 采用 getComputedStyle 检查当前实际显示状态
+      const currentDisplay = window.getComputedStyle(container).display;
+      container.style.display = currentDisplay === "none" ? "block" : "none";
     }
   </script>
 </body>
